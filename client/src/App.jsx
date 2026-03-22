@@ -1,696 +1,645 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { huntMarket, deepDive } from './api.js';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
-  bg: '#030810',
-  panel: '#070f1a',
-  border: '#0d1f35',
+  bg: '#050810',
+  panel: '#080f1c',
+  panelAlt: '#0a1220',
+  border: '#0f2040',
+  borderHover: '#1a3560',
   green: '#00ff88',
+  greenDim: '#00ff8822',
   red: '#ff3b5c',
+  redDim: '#ff3b5c22',
   yellow: '#f0b429',
   blue: '#38bdf8',
-  muted: '#4a6080',
-  text: '#e0e6f0',
+  purple: '#a78bfa',
+  muted: '#3a5070',
+  mutedText: '#6a8aaa',
+  text: '#dde6f5',
+  textDim: '#8aa0be',
 };
 
-// ─── Global styles (injected once) ────────────────────────────────────────────
+// ─── Global styles ─────────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
+  *, *::before, *::after { box-sizing: border-box; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
   }
   @keyframes pulse {
     0%, 100% { opacity: 1; }
-    50%       { opacity: 0.4; }
+    50%       { opacity: 0.3; }
   }
   @keyframes spin {
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }
   }
   @keyframes scanline {
-    0%   { background-position: 0 0; }
-    100% { background-position: 0 100%; }
+    0%   { top: -100%; }
+    100% { top: 100%; }
   }
-  .fadeUp { animation: fadeUp 0.4s ease forwards; }
-  .pulse  { animation: pulse 1.5s ease infinite; }
-  .spin   { animation: spin 0.8s linear infinite; }
+  @keyframes glow {
+    0%, 100% { box-shadow: 0 0 4px ${C.green}44; }
+    50%       { box-shadow: 0 0 12px ${C.green}88; }
+  }
 
-  input, select, button { font-family: 'IBM Plex Mono', monospace; }
-  input:focus, select:focus { outline: none; }
+  .fadeIn   { animation: fadeIn 0.3s ease forwards; }
+  .pulse    { animation: pulse 2s ease infinite; }
+  .spin     { animation: spin 0.9s linear infinite; }
+  .glow-on  { animation: glow 2s ease infinite; }
 
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: ${C.bg}; }
+  input, select, button, textarea { font-family: 'IBM Plex Mono', monospace; }
+  input:focus, select:focus, textarea:focus { outline: none; }
+
+  ::-webkit-scrollbar       { width: 3px; height: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: ${C.borderHover}; }
+
+  .panel-scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: ${C.border} transparent; }
 
   .tab-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 10px 20px;
-    font-size: 13px;
-    letter-spacing: 2px;
-    color: ${C.muted};
+    background: none; border: none; cursor: pointer;
+    padding: 8px 16px; font-family: 'Bebas Neue', cursive;
+    font-size: 15px; letter-spacing: 2px; color: ${C.muted};
     border-bottom: 2px solid transparent;
-    transition: all 0.2s;
-    font-family: 'Bebas Neue', cursive;
-    font-size: 16px;
+    transition: color 0.2s, border-color 0.2s;
   }
-  .tab-btn:hover { color: ${C.text}; }
+  .tab-btn:hover { color: ${C.textDim}; }
   .tab-btn.active { color: ${C.green}; border-bottom-color: ${C.green}; }
 
   .btn-primary {
-    background: ${C.green};
-    color: ${C.bg};
-    border: none;
-    padding: 10px 24px;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 2px;
-    cursor: pointer;
-    transition: opacity 0.2s, transform 0.1s;
-    text-transform: uppercase;
+    background: ${C.green}; color: ${C.bg}; border: none;
+    padding: 9px 20px; font-size: 11px; font-weight: 700;
+    letter-spacing: 2px; cursor: pointer; text-transform: uppercase;
+    transition: opacity 0.15s, transform 0.1s;
   }
   .btn-primary:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
-  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary:active:not(:disabled) { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  .btn-secondary {
-    background: transparent;
-    color: ${C.blue};
-    border: 1px solid ${C.blue};
-    padding: 6px 14px;
-    font-size: 11px;
-    letter-spacing: 1px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-transform: uppercase;
+  .btn-ghost {
+    background: transparent; color: ${C.blue};
+    border: 1px solid ${C.blue}55; padding: 5px 12px;
+    font-size: 10px; letter-spacing: 1.5px; cursor: pointer;
+    text-transform: uppercase; transition: all 0.15s;
   }
-  .btn-secondary:hover { background: ${C.blue}; color: ${C.bg}; }
+  .btn-ghost:hover { background: ${C.blue}18; border-color: ${C.blue}; }
 
-  .field-input {
-    background: ${C.panel};
-    border: 1px solid ${C.border};
-    color: ${C.text};
-    padding: 9px 14px;
-    font-size: 13px;
-    transition: border-color 0.2s;
-    width: 100%;
+  .btn-danger {
+    background: transparent; color: ${C.muted};
+    border: none; cursor: pointer; padding: 2px 6px;
+    font-size: 14px; line-height: 1; transition: color 0.15s;
   }
-  .field-input:focus { border-color: ${C.green}; }
+  .btn-danger:hover { color: ${C.red}; }
 
-  .card {
-    background: ${C.panel};
-    border: 1px solid ${C.border};
-    padding: 20px;
-    transition: border-color 0.2s, transform 0.2s;
+  .field {
+    background: ${C.bg}; border: 1px solid ${C.border};
+    color: ${C.text}; padding: 8px 12px; font-size: 12px;
+    width: 100%; transition: border-color 0.2s;
   }
-  .card:hover { border-color: ${C.muted}; }
+  .field:focus { border-color: ${C.green}66; }
 
   .badge {
-    display: inline-block;
-    padding: 2px 8px;
-    font-size: 10px;
-    letter-spacing: 1.5px;
-    font-weight: 600;
-    text-transform: uppercase;
+    display: inline-flex; align-items: center;
+    padding: 2px 7px; font-size: 9px; letter-spacing: 1.5px;
+    font-weight: 700; text-transform: uppercase; border-radius: 1px;
+  }
+
+  .card {
+    background: ${C.panel}; border: 1px solid ${C.border};
+    padding: 14px 16px; transition: border-color 0.2s;
+  }
+  .card:hover { border-color: ${C.borderHover}; }
+
+  .section-label {
+    font-family: 'Bebas Neue', cursive; font-size: 11px;
+    letter-spacing: 3px; color: ${C.muted}; margin-bottom: 10px;
+  }
+
+  .divider {
+    border: none; border-top: 1px solid ${C.border}; margin: 12px 0;
   }
 `;
 
 function injectGlobalCSS() {
   if (document.getElementById('axiom-styles')) return;
-  const style = document.createElement('style');
-  style.id = 'axiom-styles';
-  style.textContent = GLOBAL_CSS;
-  document.head.appendChild(style);
+  const el = document.createElement('style');
+  el.id = 'axiom-styles';
+  el.textContent = GLOBAL_CSS;
+  document.head.appendChild(el);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function directionColor(dir) {
-  return dir === 'LONG' ? C.green : dir === 'SHORT' ? C.red : C.yellow;
-}
-
-function timeframeColor(tf) {
-  const map = { SCALP: C.yellow, 'DAY TRADE': C.blue, 'SWING 24H': C.green, 'SWING 48H': C.muted };
-  return map[tf] || C.text;
-}
-
-function urgencyColor(u) {
-  return u === 'HIGH' ? C.red : u === 'MEDIUM' ? C.yellow : C.muted;
-}
-
-function conditionColor(c) {
+const directionColor = d => d === 'LONG' ? C.green : d === 'SHORT' ? C.red : C.yellow;
+const timeframeColor = tf => ({ SCALP: C.yellow, 'DAY TRADE': C.blue, 'SWING 24H': C.green, 'SWING 48H': C.purple })[tf] || C.text;
+const urgencyColor   = u => u === 'HIGH' ? C.red : u === 'MEDIUM' ? C.yellow : C.muted;
+const conditionColor = c => {
   if (!c) return C.muted;
   const u = c.toUpperCase();
-  if (u === 'BULLISH') return C.green;
-  if (u === 'BEARISH') return C.red;
-  if (u === 'VOLATILE') return C.yellow;
+  if (u.includes('BULL')) return C.green;
+  if (u.includes('BEAR')) return C.red;
+  if (u.includes('VOL'))  return C.yellow;
   return C.blue;
+};
+
+function fmt(n) {
+  if (n === undefined || n === null) return '—';
+  return n;
 }
 
+// ─── Atoms ────────────────────────────────────────────────────────────────────
 function Badge({ label, color }) {
   return (
-    <span className="badge" style={{ background: color + '22', color, border: `1px solid ${color}44` }}>
+    <span className="badge" style={{ background: color + '1a', color, border: `1px solid ${color}44` }}>
       {label}
     </span>
   );
 }
 
-function Spinner() {
+function Spinner({ label = 'PROCESSING…' }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 40 }}>
-      <div
-        className="spin"
-        style={{
-          width: 40, height: 40,
-          border: `3px solid ${C.border}`,
-          borderTopColor: C.green,
-          borderRadius: '50%',
-        }}
-      />
-      <span className="pulse" style={{ color: C.green, fontSize: 12, letterSpacing: 3 }}>SCANNING MARKETS…</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 0' }}>
+      <div className="spin" style={{
+        width: 16, height: 16, borderRadius: '50%',
+        border: `2px solid ${C.border}`, borderTopColor: C.green,
+        flexShrink: 0,
+      }} />
+      <span className="pulse" style={{ color: C.green, fontSize: 10, letterSpacing: 3 }}>{label}</span>
     </div>
   );
 }
 
-function ErrorBox({ message }) {
+function ErrorBox({ msg }) {
   return (
-    <div style={{ background: C.red + '11', border: `1px solid ${C.red}44`, padding: 16, color: C.red, fontSize: 12 }}>
-      ERROR: {message}
+    <div style={{ background: C.redDim, border: `1px solid ${C.red}44`, padding: 10, color: C.red, fontSize: 11, letterSpacing: 0.5 }}>
+      ✕ {msg}
     </div>
   );
 }
 
-function PriceRow({ label, value, color }) {
+function KV({ label, value, color }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${C.border}` }}>
-      <span style={{ color: C.muted, fontSize: 11, letterSpacing: 1 }}>{label}</span>
-      <span style={{ color: color || C.text, fontSize: 12, fontWeight: 600 }}>{value}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: `1px solid ${C.border}` }}>
+      <span style={{ color: C.muted, fontSize: 10, letterSpacing: 1.5 }}>{label}</span>
+      <span style={{ color: color || C.text, fontSize: 11, fontWeight: 600 }}>{fmt(value)}</span>
     </div>
   );
 }
 
-// ─── Tab 1: HUNT MARKET ───────────────────────────────────────────────────────
-function HuntTab({ onDeepDive }) {
-  const [capital, setCapital] = useState('10000');
-  const [mode, setMode] = useState('Full Market');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
+function InfoRow({ label, value, color }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 11, color: color || C.textDim, lineHeight: 1.65 }}>{fmt(value)}</div>
+    </div>
+  );
+}
+
+// ─── LEFT COLUMN — Hunt Market ────────────────────────────────────────────────
+function HuntPanel({ onSelectSetup }) {
+  const [capital, setCapital]   = useState('10000');
+  const [mode, setMode]         = useState('Full Market');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(null);
+  const [result, setResult]     = useState(null);
+  const [selected, setSelected] = useState(null);
 
   const launch = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    try {
-      const data = await huntMarket(capital, mode);
-      setResult(data);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true); setError(null); setResult(null); setSelected(null);
+    try { setResult(await huntMarket(capital, mode)); }
+    catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   }, [capital, mode]);
 
+  const pickSetup = useCallback(setup => {
+    setSelected(setup.ticker);
+    onSelectSetup(setup);
+  }, [onSelectSetup]);
+
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Controls */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24, alignItems: 'flex-end' }}>
-        <div style={{ flex: 1, minWidth: 160 }}>
-          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>CAPITAL ($)</label>
-          <input
-            className="field-input"
-            type="number"
-            value={capital}
-            onChange={e => setCapital(e.target.value)}
-            min="100"
-            placeholder="10000"
-          />
+      <div style={{ padding: '14px 14px 12px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>CAPITAL ($)</div>
+            <input className="field" type="number" value={capital}
+              onChange={e => setCapital(e.target.value)} min="100" />
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>MODE</div>
+            <select className="field" value={mode} onChange={e => setMode(e.target.value)}>
+              <option>Full Market</option>
+              <option>Sector Rotation</option>
+              <option>Momentum Only</option>
+            </select>
+          </div>
         </div>
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>SCAN MODE</label>
-          <select className="field-input" value={mode} onChange={e => setMode(e.target.value)}>
-            <option>Full Market</option>
-            <option>Sector Rotation</option>
-            <option>Momentum Only</option>
-          </select>
-        </div>
-        <button className="btn-primary" onClick={launch} disabled={loading || !capital}>
+        <button className="btn-primary" onClick={launch} disabled={loading || !capital}
+          style={{ width: '100%' }}>
           {loading ? '▶ SCANNING…' : '▶ LAUNCH HUNT'}
         </button>
       </div>
 
-      {loading && <Spinner />}
-      {error && <ErrorBox message={error} />}
+      {/* Results */}
+      <div className="panel-scroll" style={{ flex: 1, padding: '12px 14px' }}>
+        {loading && <Spinner label="SCANNING MARKETS…" />}
+        {error && <ErrorBox msg={error} />}
 
-      {result && (
-        <div className="fadeUp">
-          {/* Market Brief */}
-          <div className="card" style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
-              <span style={{ fontFamily: 'Bebas Neue', fontSize: 22, letterSpacing: 2, color: C.green }}>MARKET BRIEF</span>
-              <Badge label={result.marketCondition} color={conditionColor(result.marketCondition)} />
+        {result && (
+          <div className="fadeIn">
+            {/* Market status strip */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+              <Badge label={result.marketCondition || 'N/A'} color={conditionColor(result.marketCondition)} />
+              <span style={{ fontSize: 10, color: C.textDim }}>VIX {result.vixLevel}</span>
             </div>
-            <p style={{ color: C.text, fontSize: 12, lineHeight: 1.7, marginBottom: 14 }}>{result.marketBrief}</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-              <div style={{ background: C.bg, padding: 12, border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>VIX LEVEL</div>
-                <div style={{ fontSize: 13, color: C.yellow }}>{result.vixLevel}</div>
-              </div>
-              <div style={{ background: C.bg, padding: 12, border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>SECTOR FOCUS</div>
-                <div style={{ fontSize: 13, color: C.blue }}>{result.sectorFocus}</div>
-              </div>
+            <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.65, marginBottom: 12 }}>
+              {result.marketBrief}
             </div>
-          </div>
+            <div style={{ fontSize: 9, color: C.blue, letterSpacing: 1, marginBottom: 4 }}>
+              SECTOR FOCUS: <span style={{ color: C.textDim }}>{result.sectorFocus}</span>
+            </div>
+            <hr className="divider" />
 
-          {/* Setups */}
-          <div style={{ fontFamily: 'Bebas Neue', fontSize: 18, letterSpacing: 3, color: C.muted, marginBottom: 12 }}>
-            TOP SETUPS — RANKED BY CONVICTION
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
-            {(result.bestSetups || []).map((setup, i) => (
-              <SetupCard key={i} setup={setup} onDeepDive={onDeepDive} delay={i * 80} />
+            <div className="section-label">TOP SETUPS</div>
+
+            {(result.bestSetups || []).map((s, i) => (
+              <SetupMini key={i} setup={s} selected={selected === s.ticker}
+                onSelect={() => pickSetup(s)} />
             ))}
-          </div>
 
-          {/* Avoid list */}
-          {result.avoidList && result.avoidList.length > 0 && (
-            <div style={{ marginTop: 20, padding: 14, border: `1px solid ${C.red}33`, background: C.red + '08' }}>
-              <span style={{ fontSize: 10, color: C.red, letterSpacing: 2 }}>AVOID TODAY: </span>
-              {result.avoidList.map((t, i) => (
-                <span key={i} style={{ color: C.red, fontSize: 12, marginLeft: 8 }}>{t}</span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+            {result.avoidList?.length > 0 && (
+              <div style={{ marginTop: 12, padding: '8px 10px', background: C.redDim, border: `1px solid ${C.red}33` }}>
+                <span style={{ fontSize: 9, color: C.red, letterSpacing: 2 }}>AVOID: </span>
+                {result.avoidList.map((t, i) => (
+                  <span key={i} style={{ color: C.red, fontSize: 10, marginLeft: 6 }}>{t}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!loading && !error && !result && (
+          <div style={{ color: C.muted, fontSize: 10, letterSpacing: 2, textAlign: 'center', marginTop: 40 }}>
+            AWAITING SCAN
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function SetupCard({ setup, onDeepDive, delay }) {
+function SetupMini({ setup, selected, onSelect }) {
+  const dc = directionColor(setup.direction);
   return (
-    <div
-      className="card fadeUp"
-      style={{ animationDelay: `${delay}ms`, animationFillMode: 'both', opacity: 0 }}
-    >
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: C.text, letterSpacing: 2 }}>
-              {setup.ticker}
-            </span>
-            <span style={{ fontFamily: 'Bebas Neue', fontSize: 14, color: C.muted }}>#{setup.rank}</span>
-          </div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-            <Badge label={setup.direction} color={directionColor(setup.direction)} />
-            <Badge label={setup.timeframe} color={timeframeColor(setup.timeframe)} />
-            <Badge label={`${setup.urgency} URGENCY`} color={urgencyColor(setup.urgency)} />
-          </div>
+    <div onClick={onSelect} style={{
+      padding: '10px 12px', marginBottom: 6, cursor: 'pointer',
+      background: selected ? C.greenDim : C.panelAlt,
+      border: `1px solid ${selected ? C.green + '55' : C.border}`,
+      transition: 'all 0.15s',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontFamily: 'Bebas Neue', fontSize: 20, color: C.text, letterSpacing: 1 }}>
+            {setup.ticker}
+          </span>
+          <Badge label={setup.direction} color={dc} />
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1 }}>CONVICTION</div>
-          <div style={{ fontSize: 24, fontFamily: 'Bebas Neue', color: setup.conviction >= 75 ? C.green : setup.conviction >= 50 ? C.yellow : C.red }}>
+          <div style={{ fontFamily: 'Bebas Neue', fontSize: 18,
+            color: setup.conviction >= 75 ? C.green : setup.conviction >= 50 ? C.yellow : C.red }}>
             {setup.conviction}%
           </div>
+          <div style={{ fontSize: 9, color: C.muted }}>CONVICTION</div>
         </div>
       </div>
-
-      {/* Price levels */}
-      <div style={{ marginBottom: 12 }}>
-        <PriceRow label="ENTRY ZONE" value={setup.entryZone} color={C.blue} />
-        <PriceRow label="STOP LOSS" value={setup.stopLoss} color={C.red} />
-        <PriceRow label="TARGET 1" value={setup.target1} color={C.green} />
-        <PriceRow label="TARGET 2" value={setup.target2} color={C.green} />
-        <PriceRow label="R/R RATIO" value={setup.riskReward} color={C.yellow} />
+      <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
+        <Badge label={setup.timeframe} color={timeframeColor(setup.timeframe)} />
+        <Badge label={setup.urgency} color={urgencyColor(setup.urgency)} />
       </div>
-
-      {/* Details */}
-      <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>
-        <div style={{ marginBottom: 6 }}>
-          <span style={{ color: C.blue, letterSpacing: 1 }}>CATALYST: </span>
-          <span style={{ color: C.text }}>{setup.catalyst}</span>
-        </div>
-        <div style={{ marginBottom: 6 }}>
-          <span style={{ color: C.blue, letterSpacing: 1 }}>SETUP: </span>
-          <span style={{ color: C.text }}>{setup.technicalSetup}</span>
-        </div>
-        <div style={{ marginBottom: 6 }}>
-          <span style={{ color: C.blue, letterSpacing: 1 }}>VOLUME: </span>
-          <span style={{ color: C.text }}>{setup.volumeContext}</span>
-        </div>
-        <div>
-          <span style={{ color: C.red, letterSpacing: 1 }}>INVALIDATION: </span>
-          <span style={{ color: C.text }}>{setup.invalidationNote}</span>
-        </div>
+      <div style={{ fontSize: 10, color: C.textDim, marginTop: 5, lineHeight: 1.5 }}>
+        {setup.catalyst?.slice(0, 80)}{setup.catalyst?.length > 80 ? '…' : ''}
       </div>
-
-      <button className="btn-secondary" style={{ width: '100%', marginTop: 4 }} onClick={() => onDeepDive(setup.ticker)}>
-        ↗ DEEP DIVE {setup.ticker}
-      </button>
     </div>
   );
 }
 
-// ─── Tab 2: DEEP DIVE ─────────────────────────────────────────────────────────
-function DeepDiveTab({ prefillTicker, onLogTrade }) {
-  const [ticker, setTicker] = useState(prefillTicker || '');
+// ─── CENTER COLUMN — Deep Dive ────────────────────────────────────────────────
+function DeepDivePanel({ prefillSetup, onLogTrade }) {
+  const [ticker, setTicker]   = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
+  const [error, setError]     = useState(null);
+  const [result, setResult]   = useState(null);
 
+  // When a setup is selected from Hunt, pre-fill and auto-analyze
   useEffect(() => {
-    if (prefillTicker) setTicker(prefillTicker);
-  }, [prefillTicker]);
-
-  const analyze = useCallback(async () => {
-    if (!ticker.trim()) return;
-    setLoading(true);
-    setError(null);
+    if (!prefillSetup) return;
+    setTicker(prefillSetup.ticker);
     setResult(null);
-    try {
-      const data = await deepDive(ticker.trim());
-      setResult(data);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    setError(null);
+  }, [prefillSetup]);
+
+  const analyze = useCallback(async (sym) => {
+    const t = (sym || ticker).trim().toUpperCase();
+    if (!t) return;
+    setTicker(t); setLoading(true); setError(null); setResult(null);
+    try { setResult(await deepDive(t)); }
+    catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   }, [ticker]);
 
   const handleKey = e => { if (e.key === 'Enter') analyze(); };
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-        <input
-          className="field-input"
-          placeholder="Enter ticker (e.g. NVDA)"
-          value={ticker}
-          onChange={e => setTicker(e.target.value.toUpperCase())}
-          onKeyDown={handleKey}
-          style={{ flex: 1, textTransform: 'uppercase', letterSpacing: 2, fontSize: 16 }}
-        />
-        <button className="btn-primary" onClick={analyze} disabled={loading || !ticker.trim()}>
-          {loading ? 'ANALYZING…' : 'ANALYZE'}
-        </button>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Search bar */}
+      <div style={{ padding: '14px 14px 12px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input className="field" placeholder="TICKER…" value={ticker}
+            onChange={e => setTicker(e.target.value.toUpperCase())}
+            onKeyDown={handleKey}
+            style={{ flex: 1, letterSpacing: 2, textTransform: 'uppercase', fontSize: 14 }}
+          />
+          <button className="btn-primary" onClick={() => analyze()} disabled={loading || !ticker.trim()}>
+            {loading ? '…' : 'DIVE'}
+          </button>
+        </div>
       </div>
 
-      {loading && <Spinner />}
-      {error && <ErrorBox message={error} />}
+      {/* Analysis */}
+      <div className="panel-scroll" style={{ flex: 1, padding: '14px 14px' }}>
+        {loading && <Spinner label="DEEP ANALYSIS…" />}
+        {error && <ErrorBox msg={error} />}
 
-      {result && (
-        <div className="fadeUp">
-          {/* Signal header */}
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-              <div>
-                <div style={{ fontFamily: 'Bebas Neue', fontSize: 42, letterSpacing: 3, color: C.text }}>
-                  {result.ticker || ticker}
+        {!loading && !error && !result && (
+          <div style={{ color: C.muted, fontSize: 10, letterSpacing: 2, textAlign: 'center', marginTop: 40 }}>
+            {prefillSetup
+              ? <><span style={{ color: C.green }}>{prefillSetup.ticker}</span> — CLICK DIVE TO ANALYZE</>
+              : 'SELECT A SETUP OR ENTER TICKER'}
+          </div>
+        )}
+
+        {result && (
+          <div className="fadeIn">
+            {/* Header */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontFamily: 'Bebas Neue', fontSize: 48, letterSpacing: 3, color: C.text, lineHeight: 1 }}>
+                    {result.ticker || ticker}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                    <Badge label={result.signal} color={result.signal === 'LONG' ? C.green : result.signal === 'SHORT' ? C.red : C.yellow} />
+                    <Badge label={result.timeframe} color={timeframeColor(result.timeframe)} />
+                    <Badge label={`${result.urgency} URGENCY`} color={urgencyColor(result.urgency)} />
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-                  <Badge label={result.signal} color={result.signal === 'LONG' ? C.green : result.signal === 'SHORT' ? C.red : C.yellow} />
-                  <Badge label={result.timeframe} color={timeframeColor(result.timeframe)} />
-                  <Badge label={`${result.urgency} URGENCY`} color={urgencyColor(result.urgency)} />
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontFamily: 'Bebas Neue', fontSize: 42, lineHeight: 1,
+                    color: result.conviction >= 75 ? C.green : result.conviction >= 50 ? C.yellow : C.red }}>
+                    {result.conviction}%
+                  </div>
+                  <div style={{ fontSize: 9, color: C.muted, letterSpacing: 1 }}>CONVICTION</div>
+                  <div style={{ fontSize: 10, color: C.yellow, marginTop: 2 }}>MAX RISK {result.maxRiskPct}</div>
                 </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1 }}>CONVICTION</div>
-                <div style={{ fontSize: 40, fontFamily: 'Bebas Neue', color: result.conviction >= 75 ? C.green : result.conviction >= 50 ? C.yellow : C.red }}>
-                  {result.conviction}%
-                </div>
-                <div style={{ fontSize: 11, color: C.muted }}>MAX RISK: {result.maxRiskPct}</div>
               </div>
             </div>
-          </div>
 
-          {/* Price levels */}
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 16, letterSpacing: 2, color: C.muted, marginBottom: 12 }}>PRICE LEVELS</div>
-            <PriceRow label="ENTRY ZONE" value={result.entryZone} color={C.blue} />
-            <PriceRow label="STOP LOSS" value={result.stopLoss} color={C.red} />
-            <PriceRow label="TARGET 1" value={result.target1} color={C.green} />
-            <PriceRow label="TARGET 2" value={result.target2} color={C.green} />
-            <PriceRow label="R/R RATIO" value={result.riskReward} color={C.yellow} />
-          </div>
+            <hr className="divider" />
 
-          {/* Analysis */}
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 16, letterSpacing: 2, color: C.muted, marginBottom: 12 }}>ANALYSIS</div>
-            <InfoBlock label="THESIS" value={result.thesis} color={C.text} />
-            <InfoBlock label="CATALYST" value={result.catalyst} color={C.blue} />
-            <InfoBlock label="TECHNICAL SETUP" value={result.technicalSetup} color={C.blue} />
-            <InfoBlock label="INVALIDATION" value={result.invalidationNote} color={C.red} />
-            {result.warning && <InfoBlock label="WARNING" value={result.warning} color={C.yellow} />}
-          </div>
+            {/* Price levels */}
+            <div className="section-label">PRICE LEVELS</div>
+            <div style={{ marginBottom: 14 }}>
+              <KV label="ENTRY ZONE" value={result.entryZone} color={C.blue} />
+              <KV label="STOP LOSS"  value={result.stopLoss}  color={C.red} />
+              <KV label="TARGET 1"   value={result.target1}   color={C.green} />
+              <KV label="TARGET 2"   value={result.target2}   color={C.green} />
+              <KV label="R/R RATIO"  value={result.riskReward} color={C.yellow} />
+            </div>
 
-          {result.signal !== 'NO TRADE' && (
-            <button
-              className="btn-primary"
-              style={{ width: '100%' }}
-              onClick={() => onLogTrade({ ticker: result.ticker || ticker, signal: result.signal })}
-            >
-              + LOG THIS TRADE
-            </button>
-          )}
-        </div>
-      )}
+            {/* Thesis */}
+            <div className="section-label">ANALYSIS</div>
+            <InfoRow label="THESIS"          value={result.thesis}          color={C.text} />
+            <InfoRow label="CATALYST"        value={result.catalyst}        color={C.blue} />
+            <InfoRow label="TECHNICAL SETUP" value={result.technicalSetup}  color={C.textDim} />
+            <InfoRow label="INVALIDATION"    value={result.invalidationNote} color={C.red} />
+            {result.warning && <InfoRow label="WARNING" value={result.warning} color={C.yellow} />}
+
+            {result.signal !== 'NO TRADE' && (
+              <button className="btn-primary" style={{ width: '100%', marginTop: 10 }}
+                onClick={() => onLogTrade({ ticker: result.ticker || ticker, signal: result.signal })}>
+                + LOG TRADE
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function InfoBlock({ label, value, color }) {
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 12, color, lineHeight: 1.7 }}>{value}</div>
-    </div>
-  );
-}
-
-// ─── Tab 3: JOURNAL ───────────────────────────────────────────────────────────
+// ─── RIGHT COLUMN — Journal ───────────────────────────────────────────────────
 const STORAGE_KEY = 'axiom_journal_v1';
+const loadTrades = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; } };
+const saveTrades = t => localStorage.setItem(STORAGE_KEY, JSON.stringify(t));
 
-function loadTrades() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch {
-    return [];
-  }
-}
-
-function saveTrades(trades) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
-}
-
-function JournalTab({ prefillLog }) {
+function JournalPanel({ prefill }) {
   const [trades, setTrades] = useState(loadTrades);
-  const [form, setForm] = useState({
-    ticker: prefillLog?.ticker || '',
-    direction: prefillLog?.signal || 'LONG',
-    outcome: 'WIN',
-    pnl: '',
-    notes: '',
-  });
+  const [tab, setTab]       = useState('log'); // 'log' | 'history'
+  const [form, setForm]     = useState({ ticker: '', direction: 'LONG', outcome: 'WIN', pnl: '', notes: '' });
 
   useEffect(() => {
-    if (prefillLog) {
-      setForm(f => ({ ...f, ticker: prefillLog.ticker || '', direction: prefillLog.signal || 'LONG' }));
+    if (prefill) {
+      setForm(f => ({ ...f, ticker: prefill.ticker || '', direction: prefill.signal || 'LONG' }));
+      setTab('log');
     }
-  }, [prefillLog]);
+  }, [prefill]);
 
   const addTrade = () => {
     if (!form.ticker || form.pnl === '') return;
-    const trade = {
-      id: Date.now(),
-      date: new Date().toLocaleDateString(),
-      ticker: form.ticker.toUpperCase(),
-      direction: form.direction,
-      outcome: form.outcome,
-      pnl: parseFloat(form.pnl),
-      notes: form.notes,
+    const t = {
+      id: Date.now(), date: new Date().toLocaleDateString(),
+      ticker: form.ticker.toUpperCase(), direction: form.direction,
+      outcome: form.outcome, pnl: parseFloat(form.pnl), notes: form.notes,
     };
-    const updated = [trade, ...trades];
-    setTrades(updated);
-    saveTrades(updated);
+    const updated = [t, ...trades];
+    setTrades(updated); saveTrades(updated);
     setForm(f => ({ ...f, ticker: '', pnl: '', notes: '' }));
+    setTab('history');
   };
 
-  const deleteTrade = id => {
-    const updated = trades.filter(t => t.id !== id);
-    setTrades(updated);
-    saveTrades(updated);
-  };
+  const del = id => { const u = trades.filter(t => t.id !== id); setTrades(u); saveTrades(u); };
 
-  // Stats
-  const wins = trades.filter(t => t.outcome === 'WIN').length;
-  const losses = trades.filter(t => t.outcome === 'LOSS').length;
-  const winRate = trades.length ? Math.round((wins / trades.length) * 100) : 0;
-  const totalPnL = trades.reduce((sum, t) => sum + t.pnl, 0);
-  const portfolio = 10000 + totalPnL;
+  const wins     = trades.filter(t => t.outcome === 'WIN').length;
+  const totalPnL = trades.reduce((s, t) => s + t.pnl, 0);
+  const winRate  = trades.length ? Math.round((wins / trades.length) * 100) : 0;
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 16px' }}>
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 24 }}>
-        <StatBox label="TOTAL TRADES" value={trades.length} color={C.blue} />
-        <StatBox label="WIN RATE" value={`${winRate}%`} color={winRate >= 60 ? C.green : winRate >= 40 ? C.yellow : C.red} />
-        <StatBox label="TOTAL P&L" value={`${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)}`} color={totalPnL >= 0 ? C.green : C.red} />
-        <StatBox label="PORTFOLIO" value={`$${portfolio.toFixed(2)}`} color={C.text} />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Stats strip */}
+      <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.border}`, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, flexShrink: 0 }}>
+        <MiniStat label="TRADES" value={trades.length} color={C.blue} />
+        <MiniStat label="WIN %" value={`${winRate}%`} color={winRate >= 60 ? C.green : winRate >= 40 ? C.yellow : C.red} />
+        <MiniStat label="P&L" value={`${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(0)}`} color={totalPnL >= 0 ? C.green : C.red} />
+        <MiniStat label="EQUITY" value={`$${(10000 + totalPnL).toFixed(0)}`} color={C.text} />
       </div>
 
-      {/* Log form */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div style={{ fontFamily: 'Bebas Neue', fontSize: 18, letterSpacing: 2, color: C.green, marginBottom: 16 }}>LOG TRADE</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 12 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>TICKER</label>
-            <input className="field-input" value={form.ticker} onChange={e => setForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))} placeholder="NVDA" />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>DIRECTION</label>
-            <select className="field-input" value={form.direction} onChange={e => setForm(f => ({ ...f, direction: e.target.value }))}>
-              <option>LONG</option>
-              <option>SHORT</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>OUTCOME</label>
-            <select className="field-input" value={form.outcome} onChange={e => setForm(f => ({ ...f, outcome: e.target.value }))}>
-              <option>WIN</option>
-              <option>LOSS</option>
-              <option>BREAKEVEN</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>P&L ($)</label>
-            <input className="field-input" type="number" value={form.pnl} onChange={e => setForm(f => ({ ...f, pnl: e.target.value }))} placeholder="+250 or -80" />
-          </div>
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>NOTES (optional)</label>
-          <input className="field-input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="What worked, what didn't..." />
-        </div>
-        <button className="btn-primary" onClick={addTrade} disabled={!form.ticker || form.pnl === ''}>
-          + ADD TRADE
-        </button>
+      {/* Sub-tabs */}
+      <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+        <button className={`tab-btn ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>LOG</button>
+        <button className={`tab-btn ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>HISTORY</button>
       </div>
 
-      {/* Trade list */}
-      {trades.length === 0 ? (
-        <div style={{ textAlign: 'center', color: C.muted, fontSize: 12, padding: 40 }}>
-          No trades logged yet. Start trading!
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {trades.map(trade => (
-            <TradeRow key={trade.id} trade={trade} onDelete={deleteTrade} />
-          ))}
-        </div>
-      )}
+      <div className="panel-scroll" style={{ flex: 1, padding: '12px 14px' }}>
+        {tab === 'log' && (
+          <div className="fadeIn">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>TICKER</div>
+                <input className="field" value={form.ticker}
+                  onChange={e => setForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
+                  placeholder="NVDA" style={{ textTransform: 'uppercase', letterSpacing: 1 }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>DIRECTION</div>
+                <select className="field" value={form.direction} onChange={e => setForm(f => ({ ...f, direction: e.target.value }))}>
+                  <option>LONG</option><option>SHORT</option>
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>OUTCOME</div>
+                <select className="field" value={form.outcome} onChange={e => setForm(f => ({ ...f, outcome: e.target.value }))}>
+                  <option>WIN</option><option>LOSS</option><option>BREAKEVEN</option>
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>P&L ($)</div>
+                <input className="field" type="number" value={form.pnl}
+                  onChange={e => setForm(f => ({ ...f, pnl: e.target.value }))} placeholder="±amount" />
+              </div>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>NOTES</div>
+              <input className="field" value={form.notes}
+                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="What worked / didn't…" />
+            </div>
+            <button className="btn-primary" onClick={addTrade}
+              disabled={!form.ticker || form.pnl === ''} style={{ width: '100%' }}>
+              + ADD TRADE
+            </button>
+          </div>
+        )}
+
+        {tab === 'history' && (
+          <div className="fadeIn">
+            {trades.length === 0
+              ? <div style={{ color: C.muted, fontSize: 10, letterSpacing: 2, textAlign: 'center', marginTop: 30 }}>NO TRADES YET</div>
+              : trades.map(t => <TradeRow key={t.id} trade={t} onDelete={del} />)
+            }
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function StatBox({ label, value, color }) {
+function MiniStat({ label, value, color }) {
   return (
-    <div style={{ background: C.panel, border: `1px solid ${C.border}`, padding: 16 }}>
-      <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontFamily: 'Bebas Neue', color, letterSpacing: 1 }}>{value}</div>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontFamily: 'Bebas Neue', fontSize: 16, color, letterSpacing: 1 }}>{value}</div>
+      <div style={{ fontSize: 8, color: C.muted, letterSpacing: 1.5 }}>{label}</div>
     </div>
   );
 }
 
 function TradeRow({ trade, onDelete }) {
-  const outcomeColor = trade.outcome === 'WIN' ? C.green : trade.outcome === 'LOSS' ? C.red : C.yellow;
+  const oc = trade.outcome === 'WIN' ? C.green : trade.outcome === 'LOSS' ? C.red : C.yellow;
   return (
-    <div
-      className="fadeUp"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        padding: '12px 16px',
-        background: C.panel,
-        border: `1px solid ${outcomeColor}22`,
-        borderLeft: `3px solid ${outcomeColor}`,
-        flexWrap: 'wrap',
-      }}
-    >
-      <span style={{ fontFamily: 'Bebas Neue', fontSize: 18, color: C.text, letterSpacing: 2, minWidth: 70 }}>{trade.ticker}</span>
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+      marginBottom: 5, background: C.panelAlt,
+      border: `1px solid ${oc}22`, borderLeft: `2px solid ${oc}`,
+      flexWrap: 'wrap',
+    }}>
+      <span style={{ fontFamily: 'Bebas Neue', fontSize: 15, color: C.text, letterSpacing: 1, minWidth: 50 }}>{trade.ticker}</span>
       <Badge label={trade.direction} color={directionColor(trade.direction)} />
-      <Badge label={trade.outcome} color={outcomeColor} />
-      <span style={{ color: trade.pnl >= 0 ? C.green : C.red, fontSize: 14, fontWeight: 600, flex: 1 }}>
+      <Badge label={trade.outcome}   color={oc} />
+      <span style={{ color: trade.pnl >= 0 ? C.green : C.red, fontSize: 12, fontWeight: 600, flex: 1, textAlign: 'right' }}>
         {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
       </span>
-      <span style={{ color: C.muted, fontSize: 11 }}>{trade.date}</span>
-      {trade.notes && <span style={{ color: C.muted, fontSize: 11, width: '100%', marginTop: 4 }}>{trade.notes}</span>}
-      <button
-        onClick={() => onDelete(trade.id)}
-        style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 4px' }}
-        title="Delete"
-      >×</button>
+      <span style={{ color: C.muted, fontSize: 9 }}>{trade.date}</span>
+      <button className="btn-danger" onClick={() => onDelete(trade.id)}>×</button>
+      {trade.notes && (
+        <div style={{ width: '100%', fontSize: 10, color: C.muted, marginTop: 2 }}>{trade.notes}</div>
+      )}
     </div>
   );
 }
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  injectGlobalCSS();
+  useEffect(() => { injectGlobalCSS(); }, []);
 
-  const [tab, setTab] = useState('hunt');
-  const [deepDiveTicker, setDeepDiveTicker] = useState('');
+  const [selectedSetup, setSelectedSetup] = useState(null);
   const [journalPrefill, setJournalPrefill] = useState(null);
 
-  const handleDeepDive = useCallback(ticker => {
-    setDeepDiveTicker(ticker);
-    setTab('dive');
-  }, []);
+  const handleLogTrade = useCallback(data => setJournalPrefill(data), []);
 
-  const handleLogTrade = useCallback(data => {
-    setJournalPrefill(data);
-    setTab('journal');
-  }, []);
+  const COL = { flex: '1 1 0', minWidth: 0, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' };
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg }}>
-      {/* Header */}
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: '0 24px', position: 'sticky', top: 0, background: C.bg, zIndex: 100 }}>
-        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '12px 0' }}>
-            <span style={{ fontFamily: 'Bebas Neue', fontSize: 32, letterSpacing: 6, color: C.green }}>AXIOM</span>
-            <span style={{ fontSize: 10, color: C.muted, letterSpacing: 3 }}>AUTONOMOUS TRADING AGENT</span>
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', fontFamily: "'IBM Plex Mono', monospace" }}>
+
+      {/* ── Top bar ── */}
+      <header style={{ borderBottom: `1px solid ${C.border}`, padding: '0 20px', background: C.bg, zIndex: 10, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <span style={{ fontFamily: 'Bebas Neue', fontSize: 28, letterSpacing: 6, color: C.green }}>AXIOM</span>
+            <span style={{ fontSize: 9, color: C.muted, letterSpacing: 3 }}>AUTONOMOUS TRADING AGENT</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <div className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, marginRight: 8 }} />
-            <span style={{ fontSize: 10, color: C.green, letterSpacing: 2 }}>LIVE</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2 }}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="pulse glow-on" style={{ width: 6, height: 6, borderRadius: '50%', background: C.green }} />
+              <span style={{ fontSize: 9, color: C.green, letterSpacing: 2 }}>LIVE</span>
+            </div>
           </div>
-        </div>
-        {/* Tabs */}
-        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', gap: 4 }}>
-          <button className={`tab-btn ${tab === 'hunt' ? 'active' : ''}`} onClick={() => setTab('hunt')}>
-            ◈ HUNT MARKET
-          </button>
-          <button className={`tab-btn ${tab === 'dive' ? 'active' : ''}`} onClick={() => setTab('dive')}>
-            ⊕ DEEP DIVE
-          </button>
-          <button className={`tab-btn ${tab === 'journal' ? 'active' : ''}`} onClick={() => setTab('journal')}>
-            ◎ JOURNAL
-          </button>
         </div>
       </header>
 
-      {/* Content */}
-      <main>
-        {tab === 'hunt' && <HuntTab onDeepDive={handleDeepDive} />}
-        {tab === 'dive' && <DeepDiveTab prefillTicker={deepDiveTicker} onLogTrade={handleLogTrade} />}
-        {tab === 'journal' && <JournalTab prefillLog={journalPrefill} />}
-      </main>
+      {/* ── Column labels ── */}
+      <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexShrink: 0, background: C.panelAlt }}>
+        {[['◈ HUNT MARKET', ''], ['⊕ DEEP DIVE', ''], ['◎ JOURNAL', '']].map(([label], i) => (
+          <div key={i} style={{ flex: '1 1 0', padding: '6px 14px', borderRight: `1px solid ${C.border}`, fontSize: 10, letterSpacing: 3, color: C.muted, fontFamily: 'Bebas Neue' }}>
+            {label}
+          </div>
+        ))}
+      </div>
 
-      {/* Footer */}
-      <footer style={{ textAlign: 'center', padding: '24px 16px', color: C.muted, fontSize: 10, letterSpacing: 2, borderTop: `1px solid ${C.border}` }}>
-        AXIOM v1.0 — FOR EDUCATIONAL PURPOSES ONLY. NOT FINANCIAL ADVICE.
+      {/* ── 3-column layout ── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+        <div style={COL}>
+          <HuntPanel onSelectSetup={setSelectedSetup} />
+        </div>
+        <div style={{ ...COL }}>
+          <DeepDivePanel prefillSetup={selectedSetup} onLogTrade={handleLogTrade} />
+        </div>
+        <div style={{ ...COL, borderRight: 'none' }}>
+          <JournalPanel prefill={journalPrefill} />
+        </div>
+      </div>
+
+      {/* ── Footer ── */}
+      <footer style={{ borderTop: `1px solid ${C.border}`, padding: '7px 20px', display: 'flex', justifyContent: 'space-between', flexShrink: 0 }}>
+        <span style={{ fontSize: 9, color: C.muted, letterSpacing: 2 }}>AXIOM v2.0</span>
+        <span style={{ fontSize: 9, color: C.muted, letterSpacing: 1 }}>FOR EDUCATIONAL PURPOSES ONLY — NOT FINANCIAL ADVICE</span>
       </footer>
     </div>
   );
