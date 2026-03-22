@@ -190,8 +190,8 @@ function PriceRow({ label, value, color }) {
 }
 
 // ─── Tab 1: HUNT MARKET ───────────────────────────────────────────────────────
-function HuntTab({ onDeepDive }) {
-  const [capital, setCapital] = useState('10000');
+function HuntTab({ onDeepDive, defaultCapital, profile }) {
+  const [capital, setCapital] = useState(String(defaultCapital || '10000'));
   const [mode, setMode] = useState('Full Market');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -202,7 +202,7 @@ function HuntTab({ onDeepDive }) {
     setError(null);
     setResult(null);
     try {
-      const data = await huntMarket(capital, mode);
+      const data = await huntMarket(capital, mode, profile);
       setResult(data);
     } catch (e) {
       setError(e.message);
@@ -354,7 +354,7 @@ function SetupCard({ setup, onDeepDive, delay }) {
 }
 
 // ─── Tab 2: DEEP DIVE ─────────────────────────────────────────────────────────
-function DeepDiveTab({ prefillTicker, onLogTrade }) {
+function DeepDiveTab({ prefillTicker, onLogTrade, profile }) {
   const [ticker, setTicker] = useState(prefillTicker || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -370,7 +370,7 @@ function DeepDiveTab({ prefillTicker, onLogTrade }) {
     setError(null);
     setResult(null);
     try {
-      const data = await deepDive(ticker.trim());
+      const data = await deepDive(ticker.trim(), profile);
       setResult(data);
     } catch (e) {
       setError(e.message);
@@ -469,6 +469,30 @@ function InfoBlock({ label, value, color }) {
   );
 }
 
+// ─── Trader Profile ───────────────────────────────────────────────────────────
+const PROFILE_KEY = 'axiom_profile_v1';
+const DEFAULT_PROFILE = {
+  name: 'Marcus Reid',
+  role: 'Institutional Trader',
+  experience: '20 years',
+  markets: ['NYSE', 'NASDAQ'],
+  tradingStyles: ['scalping', 'day trading', 'swing trading'],
+  capital: 5000,
+};
+
+function loadProfile() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PROFILE_KEY));
+    return stored || DEFAULT_PROFILE;
+  } catch {
+    return DEFAULT_PROFILE;
+  }
+}
+
+function saveProfile(profile) {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+}
+
 // ─── Tab 3: JOURNAL ───────────────────────────────────────────────────────────
 const STORAGE_KEY = 'axiom_journal_v1';
 
@@ -484,7 +508,7 @@ function saveTrades(trades) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
 }
 
-function JournalTab({ prefillLog }) {
+function JournalTab({ prefillLog, baseCapital }) {
   const [trades, setTrades] = useState(loadTrades);
   const [form, setForm] = useState({
     ticker: prefillLog?.ticker || '',
@@ -528,7 +552,7 @@ function JournalTab({ prefillLog }) {
   const losses = trades.filter(t => t.outcome === 'LOSS').length;
   const winRate = trades.length ? Math.round((wins / trades.length) * 100) : 0;
   const totalPnL = trades.reduce((sum, t) => sum + t.pnl, 0);
-  const portfolio = 10000 + totalPnL;
+  const portfolio = (baseCapital || 10000) + totalPnL;
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 16px' }}>
@@ -642,6 +666,11 @@ export default function App() {
   const [tab, setTab] = useState('hunt');
   const [deepDiveTicker, setDeepDiveTicker] = useState('');
   const [journalPrefill, setJournalPrefill] = useState(null);
+  const [profile] = useState(() => {
+    const p = loadProfile();
+    saveProfile(p);
+    return p;
+  });
 
   const handleDeepDive = useCallback(ticker => {
     setDeepDiveTicker(ticker);
@@ -662,9 +691,17 @@ export default function App() {
             <span style={{ fontFamily: 'Bebas Neue', fontSize: 32, letterSpacing: 6, color: C.green }}>AXIOM</span>
             <span style={{ fontSize: 10, color: C.muted, letterSpacing: 3 }}>AUTONOMOUS TRADING AGENT</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <div className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, marginRight: 8 }} />
-            <span style={{ fontSize: 10, color: C.green, letterSpacing: 2 }}>LIVE</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 11, color: C.text, letterSpacing: 1 }}>{profile.name}</div>
+              <div style={{ fontSize: 10, color: C.muted, letterSpacing: 1 }}>
+                {profile.experience} · {profile.markets.join('/')} · ${profile.capital.toLocaleString()}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <div className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, marginRight: 8 }} />
+              <span style={{ fontSize: 10, color: C.green, letterSpacing: 2 }}>LIVE</span>
+            </div>
           </div>
         </div>
         {/* Tabs */}
@@ -683,9 +720,9 @@ export default function App() {
 
       {/* Content */}
       <main>
-        {tab === 'hunt' && <HuntTab onDeepDive={handleDeepDive} />}
-        {tab === 'dive' && <DeepDiveTab prefillTicker={deepDiveTicker} onLogTrade={handleLogTrade} />}
-        {tab === 'journal' && <JournalTab prefillLog={journalPrefill} />}
+        {tab === 'hunt' && <HuntTab onDeepDive={handleDeepDive} defaultCapital={profile.capital} profile={profile} />}
+        {tab === 'dive' && <DeepDiveTab prefillTicker={deepDiveTicker} onLogTrade={handleLogTrade} profile={profile} />}
+        {tab === 'journal' && <JournalTab prefillLog={journalPrefill} baseCapital={profile.capital} />}
       </main>
 
       {/* Footer */}
