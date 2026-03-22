@@ -85,10 +85,36 @@ async function callAxiom(system, userMessage) {
   const data = await res.json();
   const text = data.content || '';
 
-  // Extract JSON from response
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('No JSON found in response');
-  return JSON.parse(jsonMatch[0]);
+  // Extract JSON from response — handle plain JSON, markdown code blocks, or bare objects
+  const trimmed = text.trim();
+
+  // 1. Try direct parse first (model returned raw JSON)
+  try {
+    return JSON.parse(trimmed);
+  } catch {}
+
+  // 2. Try extracting from markdown code block: ```json { ... } ```
+  const codeBlockMatch = trimmed.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+  if (codeBlockMatch) {
+    try {
+      return JSON.parse(codeBlockMatch[1]);
+    } catch {}
+  }
+
+  // 3. Fallback: find outermost JSON object via brace counting
+  const start = trimmed.indexOf('{');
+  if (start === -1) throw new Error('No JSON found in response');
+  let depth = 0;
+  let end = -1;
+  for (let i = start; i < trimmed.length; i++) {
+    if (trimmed[i] === '{') depth++;
+    else if (trimmed[i] === '}') {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  if (end === -1) throw new Error('Malformed JSON in response');
+  return JSON.parse(trimmed.slice(start, end + 1));
 }
 
 export async function huntMarket(capital, mode) {
