@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { huntMarket, deepDive } from './api.js';
+import './theme.css';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
-  bg: '#030810',
-  panel: '#070f1a',
-  border: '#0d1f35',
-  green: '#00ff88',
-  red: '#ff3b5c',
-  yellow: '#f0b429',
-  blue: '#38bdf8',
-  muted: '#4a6080',
-  text: '#e0e6f0',
+  bg: 'var(--bg)',
+  panel: 'var(--bg2)',
+  border: 'var(--border)',
+  green: 'var(--green)',
+  red: 'var(--red)',
+  yellow: 'var(--yellow)',
+  blue: 'var(--blue)',
+  muted: 'var(--text3)',
+  text: 'var(--text)',
 };
 
 // ─── Global styles (injected once) ────────────────────────────────────────────
