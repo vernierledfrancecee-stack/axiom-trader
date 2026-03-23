@@ -659,6 +659,163 @@ function TradeRow({ trade, onDelete }) {
   );
 }
 
+// ─── Tab 4: PROFILE ───────────────────────────────────────────────────────────
+const STYLE_OPTIONS = ['scalping', 'day trading', 'swing trading', 'position trading'];
+const MARKET_OPTIONS = ['NYSE', 'NASDAQ'];
+
+function ProfileTab({ profile, onSave }) {
+  const [form, setForm] = useState({ ...profile });
+  const [saved, setSaved] = useState(false);
+
+  const toggleStyle = style => {
+    setForm(f => ({
+      ...f,
+      tradingStyles: f.tradingStyles.includes(style)
+        ? f.tradingStyles.filter(s => s !== style)
+        : [...f.tradingStyles, style],
+    }));
+  };
+
+  const toggleMarket = market => {
+    setForm(f => ({
+      ...f,
+      markets: f.markets.includes(market)
+        ? f.markets.filter(m => m !== market)
+        : [...f.markets, market],
+    }));
+  };
+
+  const handleSave = () => {
+    onSave(form);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const isValid = form.name.trim() && form.capital > 0 && form.tradingStyles.length > 0 && form.markets.length > 0;
+
+  return (
+    <div style={{ maxWidth: 560, margin: '0 auto', padding: '24px 16px' }}>
+      <div className="card">
+        <div style={{ fontFamily: 'Bebas Neue', fontSize: 22, letterSpacing: 3, color: C.green, marginBottom: 24 }}>
+          TRADER PROFILE
+        </div>
+
+        {/* Name */}
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>TRADER NAME</label>
+          <input
+            className="field-input"
+            value={form.name}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+            placeholder="Marcus Reid"
+          />
+        </div>
+
+        {/* Role */}
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>ROLE</label>
+          <input
+            className="field-input"
+            value={form.role}
+            onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+            placeholder="Institutional Trader"
+          />
+        </div>
+
+        {/* Experience */}
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>EXPERIENCE</label>
+          <input
+            className="field-input"
+            value={form.experience}
+            onChange={e => setForm(f => ({ ...f, experience: e.target.value }))}
+            placeholder="20 years"
+          />
+        </div>
+
+        {/* Capital */}
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>CAPITAL ($)</label>
+          <input
+            className="field-input"
+            type="number"
+            min="100"
+            value={form.capital}
+            onChange={e => setForm(f => ({ ...f, capital: parseFloat(e.target.value) || 0 }))}
+            placeholder="5000"
+          />
+        </div>
+
+        {/* Markets */}
+        <div style={{ marginBottom: 18 }}>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 10 }}>MARKETS</label>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {MARKET_OPTIONS.map(m => (
+              <button
+                key={m}
+                onClick={() => toggleMarket(m)}
+                style={{
+                  padding: '6px 18px',
+                  fontSize: 12,
+                  letterSpacing: 2,
+                  fontFamily: 'IBM Plex Mono, monospace',
+                  cursor: 'pointer',
+                  border: `1px solid ${form.markets.includes(m) ? C.green : C.border}`,
+                  background: form.markets.includes(m) ? C.green + '18' : 'transparent',
+                  color: form.markets.includes(m) ? C.green : C.muted,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Trading Styles */}
+        <div style={{ marginBottom: 24 }}>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 10 }}>TRADING STYLES</label>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {STYLE_OPTIONS.map(s => (
+              <button
+                key={s}
+                onClick={() => toggleStyle(s)}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 11,
+                  letterSpacing: 1,
+                  fontFamily: 'IBM Plex Mono, monospace',
+                  cursor: 'pointer',
+                  border: `1px solid ${form.tradingStyles.includes(s) ? C.blue : C.border}`,
+                  background: form.tradingStyles.includes(s) ? C.blue + '18' : 'transparent',
+                  color: form.tradingStyles.includes(s) ? C.blue : C.muted,
+                  transition: 'all 0.15s',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button className="btn-primary" onClick={handleSave} disabled={!isValid} style={{ width: '100%' }}>
+          {saved ? '✓ SAVED' : 'SAVE PROFILE'}
+        </button>
+      </div>
+
+      {/* Risk summary */}
+      <div style={{ marginTop: 16, padding: 16, border: `1px solid ${C.border}`, background: C.panel }}>
+        <div style={{ fontFamily: 'Bebas Neue', fontSize: 14, letterSpacing: 2, color: C.muted, marginBottom: 12 }}>RISK PARAMETERS</div>
+        <PriceRow label="MAX RISK / TRADE (2%)" value={`$${(form.capital * 0.02).toFixed(2)}`} color={C.yellow} />
+        <PriceRow label="DAILY DRAWDOWN LIMIT (3%)" value={`$${(form.capital * 0.03).toFixed(2)}`} color={C.red} />
+        <PriceRow label="MAX POSITIONS" value="3" color={C.blue} />
+        <PriceRow label="MIN R/R RATIO" value="1:1.5" color={C.green} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Root App ─────────────────────────────────────────────────────────────────
 export default function App() {
   injectGlobalCSS();
@@ -666,11 +823,16 @@ export default function App() {
   const [tab, setTab] = useState('hunt');
   const [deepDiveTicker, setDeepDiveTicker] = useState('');
   const [journalPrefill, setJournalPrefill] = useState(null);
-  const [profile] = useState(() => {
+  const [profile, setProfile] = useState(() => {
     const p = loadProfile();
     saveProfile(p);
     return p;
   });
+
+  const handleSaveProfile = useCallback(updated => {
+    saveProfile(updated);
+    setProfile(updated);
+  }, []);
 
   const handleDeepDive = useCallback(ticker => {
     setDeepDiveTicker(ticker);
@@ -715,6 +877,9 @@ export default function App() {
           <button className={`tab-btn ${tab === 'journal' ? 'active' : ''}`} onClick={() => setTab('journal')}>
             ◎ JOURNAL
           </button>
+          <button className={`tab-btn ${tab === 'profile' ? 'active' : ''}`} onClick={() => setTab('profile')}>
+            ◉ PROFILE
+          </button>
         </div>
       </header>
 
@@ -723,6 +888,7 @@ export default function App() {
         {tab === 'hunt' && <HuntTab onDeepDive={handleDeepDive} defaultCapital={profile.capital} profile={profile} />}
         {tab === 'dive' && <DeepDiveTab prefillTicker={deepDiveTicker} onLogTrade={handleLogTrade} profile={profile} />}
         {tab === 'journal' && <JournalTab prefillLog={journalPrefill} baseCapital={profile.capital} />}
+        {tab === 'profile' && <ProfileTab profile={profile} onSave={handleSaveProfile} />}
       </main>
 
       {/* Footer */}
