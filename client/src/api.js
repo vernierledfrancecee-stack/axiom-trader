@@ -77,11 +77,11 @@ RÉPONDS UNIQUEMENT AVEC DU JSON VALIDE — pas de markdown, pas d'explication h
   "warning": "string — risques clés ou points de vigilance"
 }`;
 
-async function callAxiom(system, userMessage) {
+async function callAxiom(system, userMessage, model) {
   const res = await fetch('/api/axiom', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system, user: userMessage }),
+    body: JSON.stringify({ system, user: userMessage, model }),
   });
 
   if (!res.ok) {
@@ -105,15 +105,13 @@ export async function huntMarket(capital, mode, profile) {
 
 Utilise la recherche web pour trouver les meilleures opportunités du jour. Trouve 4 setups à forte conviction en respectant toutes les règles. Retourne le JSON.`;
 
-  return callAxiom(system, userMessage);
+  return callAxiom(system, userMessage, 'claude-sonnet-4-20250514');
 }
 
 export async function deepDive(ticker, profile) {
   const profileCtx = buildProfileContext(profile);
   const system = SINGLE_SYSTEM + profileCtx;
-  const userMessage = `Analyse en profondeur ${ticker.toUpperCase()} MAINTENANT.
+  const userMessage = `Analyse ${ticker.toUpperCase()} maintenant. Prix actuel, actualités, niveaux techniques, volume. Retourne le JSON.`;
 
-Utilise la recherche web pour obtenir : prix actuel, actualités du jour, résultats récents, niveaux techniques, volume et catalyseurs. Applique toutes les règles et retourne l'analyse complète en JSON.`;
-
-  return callAxiom(system, userMessage);
+  return callAxiom(system, userMessage, 'claude-haiku-4-5-20251001');
 }
