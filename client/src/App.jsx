@@ -168,7 +168,7 @@ function Spinner() {
           borderRadius: '50%',
         }}
       />
-      <span className="pulse" style={{ color: C.green, fontSize: 12, letterSpacing: 3 }}>SCANNING MARKETS…</span>
+      <span className="pulse" style={{ color: C.green, fontSize: 12, letterSpacing: 3 }}>SCAN DU MARCHÉ…</span>
     </div>
   );
 }
@@ -176,7 +176,7 @@ function Spinner() {
 function ErrorBox({ message }) {
   return (
     <div style={{ background: C.red + '11', border: `1px solid ${C.red}44`, padding: 16, color: C.red, fontSize: 12 }}>
-      ERROR: {message}
+      ERREUR : {message}
     </div>
   );
 }
@@ -228,15 +228,15 @@ function HuntTab({ onDeepDive, defaultCapital, profile }) {
           />
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
-          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>SCAN MODE</label>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>MODE DE SCAN</label>
           <select className="field-input" value={mode} onChange={e => setMode(e.target.value)}>
-            <option>Full Market</option>
-            <option>Sector Rotation</option>
-            <option>Momentum Only</option>
+            <option>Marché complet</option>
+            <option>Rotation sectorielle</option>
+            <option>Momentum uniquement</option>
           </select>
         </div>
         <button className="btn-primary" onClick={launch} disabled={loading || !capital}>
-          {loading ? '▶ SCANNING…' : '▶ LAUNCH HUNT'}
+          {loading ? '▶ SCAN EN COURS…' : '▶ LANCER LA CHASSE'}
         </button>
       </div>
 
@@ -248,17 +248,17 @@ function HuntTab({ onDeepDive, defaultCapital, profile }) {
           {/* Market Brief */}
           <div className="card" style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
-              <span style={{ fontFamily: 'Bebas Neue', fontSize: 22, letterSpacing: 2, color: C.green }}>MARKET BRIEF</span>
+              <span style={{ fontFamily: 'Bebas Neue', fontSize: 22, letterSpacing: 2, color: C.green }}>RÉSUMÉ MARCHÉ</span>
               <Badge label={result.marketCondition} color={conditionColor(result.marketCondition)} />
             </div>
             <p style={{ color: C.text, fontSize: 12, lineHeight: 1.7, marginBottom: 14 }}>{result.marketBrief}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
               <div style={{ background: C.bg, padding: 12, border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>VIX LEVEL</div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>NIVEAU VIX</div>
                 <div style={{ fontSize: 13, color: C.yellow }}>{result.vixLevel}</div>
               </div>
               <div style={{ background: C.bg, padding: 12, border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>SECTOR FOCUS</div>
+                <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>SECTEUR CIBLÉ</div>
                 <div style={{ fontSize: 13, color: C.blue }}>{result.sectorFocus}</div>
               </div>
             </div>
@@ -266,7 +266,7 @@ function HuntTab({ onDeepDive, defaultCapital, profile }) {
 
           {/* Setups */}
           <div style={{ fontFamily: 'Bebas Neue', fontSize: 18, letterSpacing: 3, color: C.muted, marginBottom: 12 }}>
-            TOP SETUPS — RANKED BY CONVICTION
+            MEILLEURS SETUPS — CLASSÉS PAR CONVICTION
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
             {(result.bestSetups || []).map((setup, i) => (
@@ -277,7 +277,7 @@ function HuntTab({ onDeepDive, defaultCapital, profile }) {
           {/* Avoid list */}
           {result.avoidList && result.avoidList.length > 0 && (
             <div style={{ marginTop: 20, padding: 14, border: `1px solid ${C.red}33`, background: C.red + '08' }}>
-              <span style={{ fontSize: 10, color: C.red, letterSpacing: 2 }}>AVOID TODAY: </span>
+              <span style={{ fontSize: 10, color: C.red, letterSpacing: 2 }}>À ÉVITER AUJOURD'HUI : </span>
               {result.avoidList.map((t, i) => (
                 <span key={i} style={{ color: C.red, fontSize: 12, marginLeft: 8 }}>{t}</span>
               ))}
@@ -307,7 +307,7 @@ function SetupCard({ setup, onDeepDive, delay }) {
           <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
             <Badge label={setup.direction} color={directionColor(setup.direction)} />
             <Badge label={setup.timeframe} color={timeframeColor(setup.timeframe)} />
-            <Badge label={`${setup.urgency} URGENCY`} color={urgencyColor(setup.urgency)} />
+            <Badge label={`URGENCE ${setup.urgency}`} color={urgencyColor(setup.urgency)} />
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -320,35 +320,35 @@ function SetupCard({ setup, onDeepDive, delay }) {
 
       {/* Price levels */}
       <div style={{ marginBottom: 12 }}>
-        <PriceRow label="ENTRY ZONE" value={setup.entryZone} color={C.blue} />
+        <PriceRow label="ZONE D'ENTRÉE" value={setup.entryZone} color={C.blue} />
         <PriceRow label="STOP LOSS" value={setup.stopLoss} color={C.red} />
-        <PriceRow label="TARGET 1" value={setup.target1} color={C.green} />
-        <PriceRow label="TARGET 2" value={setup.target2} color={C.green} />
-        <PriceRow label="R/R RATIO" value={setup.riskReward} color={C.yellow} />
+        <PriceRow label="OBJECTIF 1" value={setup.target1} color={C.green} />
+        <PriceRow label="OBJECTIF 2" value={setup.target2} color={C.green} />
+        <PriceRow label="RATIO R/R" value={setup.riskReward} color={C.yellow} />
       </div>
 
       {/* Details */}
       <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>
         <div style={{ marginBottom: 6 }}>
-          <span style={{ color: C.blue, letterSpacing: 1 }}>CATALYST: </span>
+          <span style={{ color: C.blue, letterSpacing: 1 }}>CATALYSEUR : </span>
           <span style={{ color: C.text }}>{setup.catalyst}</span>
         </div>
         <div style={{ marginBottom: 6 }}>
-          <span style={{ color: C.blue, letterSpacing: 1 }}>SETUP: </span>
+          <span style={{ color: C.blue, letterSpacing: 1 }}>SETUP : </span>
           <span style={{ color: C.text }}>{setup.technicalSetup}</span>
         </div>
         <div style={{ marginBottom: 6 }}>
-          <span style={{ color: C.blue, letterSpacing: 1 }}>VOLUME: </span>
+          <span style={{ color: C.blue, letterSpacing: 1 }}>VOLUME : </span>
           <span style={{ color: C.text }}>{setup.volumeContext}</span>
         </div>
         <div>
-          <span style={{ color: C.red, letterSpacing: 1 }}>INVALIDATION: </span>
+          <span style={{ color: C.red, letterSpacing: 1 }}>INVALIDATION : </span>
           <span style={{ color: C.text }}>{setup.invalidationNote}</span>
         </div>
       </div>
 
       <button className="btn-secondary" style={{ width: '100%', marginTop: 4 }} onClick={() => onDeepDive(setup.ticker)}>
-        ↗ DEEP DIVE {setup.ticker}
+        ↗ ANALYSE {setup.ticker}
       </button>
     </div>
   );
@@ -387,14 +387,14 @@ function DeepDiveTab({ prefillTicker, onLogTrade, profile }) {
       <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
         <input
           className="field-input"
-          placeholder="Enter ticker (e.g. NVDA)"
+          placeholder="Entrer un ticker (ex : NVDA)"
           value={ticker}
           onChange={e => setTicker(e.target.value.toUpperCase())}
           onKeyDown={handleKey}
           style={{ flex: 1, textTransform: 'uppercase', letterSpacing: 2, fontSize: 16 }}
         />
         <button className="btn-primary" onClick={analyze} disabled={loading || !ticker.trim()}>
-          {loading ? 'ANALYZING…' : 'ANALYZE'}
+          {loading ? 'ANALYSE EN COURS…' : 'ANALYSER'}
         </button>
       </div>
 
@@ -428,22 +428,22 @@ function DeepDiveTab({ prefillTicker, onLogTrade, profile }) {
 
           {/* Price levels */}
           <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 16, letterSpacing: 2, color: C.muted, marginBottom: 12 }}>PRICE LEVELS</div>
-            <PriceRow label="ENTRY ZONE" value={result.entryZone} color={C.blue} />
+            <div style={{ fontFamily: 'Bebas Neue', fontSize: 16, letterSpacing: 2, color: C.muted, marginBottom: 12 }}>NIVEAUX DE PRIX</div>
+            <PriceRow label="ZONE D'ENTRÉE" value={result.entryZone} color={C.blue} />
             <PriceRow label="STOP LOSS" value={result.stopLoss} color={C.red} />
-            <PriceRow label="TARGET 1" value={result.target1} color={C.green} />
-            <PriceRow label="TARGET 2" value={result.target2} color={C.green} />
-            <PriceRow label="R/R RATIO" value={result.riskReward} color={C.yellow} />
+            <PriceRow label="OBJECTIF 1" value={result.target1} color={C.green} />
+            <PriceRow label="OBJECTIF 2" value={result.target2} color={C.green} />
+            <PriceRow label="RATIO R/R" value={result.riskReward} color={C.yellow} />
           </div>
 
-          {/* Analysis */}
+          {/* Analyse */}
           <div className="card" style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: 'Bebas Neue', fontSize: 16, letterSpacing: 2, color: C.muted, marginBottom: 12 }}>ANALYSIS</div>
-            <InfoBlock label="THESIS" value={result.thesis} color={C.text} />
-            <InfoBlock label="CATALYST" value={result.catalyst} color={C.blue} />
-            <InfoBlock label="TECHNICAL SETUP" value={result.technicalSetup} color={C.blue} />
+            <div style={{ fontFamily: 'Bebas Neue', fontSize: 16, letterSpacing: 2, color: C.muted, marginBottom: 12 }}>ANALYSE</div>
+            <InfoBlock label="THÈSE" value={result.thesis} color={C.text} />
+            <InfoBlock label="CATALYSEUR" value={result.catalyst} color={C.blue} />
+            <InfoBlock label="SETUP TECHNIQUE" value={result.technicalSetup} color={C.blue} />
             <InfoBlock label="INVALIDATION" value={result.invalidationNote} color={C.red} />
-            {result.warning && <InfoBlock label="WARNING" value={result.warning} color={C.yellow} />}
+            {result.warning && <InfoBlock label="AVERTISSEMENT" value={result.warning} color={C.yellow} />}
           </div>
 
           {result.signal !== 'NO TRADE' && (
@@ -452,7 +452,7 @@ function DeepDiveTab({ prefillTicker, onLogTrade, profile }) {
               style={{ width: '100%' }}
               onClick={() => onLogTrade({ ticker: result.ticker || ticker, signal: result.signal })}
             >
-              + LOG THIS TRADE
+              + ENREGISTRER CE TRADE
             </button>
           )}
         </div>
@@ -559,15 +559,15 @@ function JournalTab({ prefillLog, baseCapital }) {
     <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 16px' }}>
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 24 }}>
-        <StatBox label="TOTAL TRADES" value={trades.length} color={C.blue} />
-        <StatBox label="WIN RATE" value={`${winRate}%`} color={winRate >= 60 ? C.green : winRate >= 40 ? C.yellow : C.red} />
+        <StatBox label="TRADES TOTAUX" value={trades.length} color={C.blue} />
+        <StatBox label="TAUX DE RÉUSSITE" value={`${winRate}%`} color={winRate >= 60 ? C.green : winRate >= 40 ? C.yellow : C.red} />
         <StatBox label="TOTAL P&L" value={`${totalPnL >= 0 ? '+' : ''}$${totalPnL.toFixed(2)}`} color={totalPnL >= 0 ? C.green : C.red} />
-        <StatBox label="PORTFOLIO" value={`$${portfolio.toFixed(2)}`} color={C.text} />
+        <StatBox label="PORTEFEUILLE" value={`$${portfolio.toFixed(2)}`} color={C.text} />
       </div>
 
       {/* Log form */}
       <div className="card" style={{ marginBottom: 24 }}>
-        <div style={{ fontFamily: 'Bebas Neue', fontSize: 18, letterSpacing: 2, color: C.green, marginBottom: 16 }}>LOG TRADE</div>
+        <div style={{ fontFamily: 'Bebas Neue', fontSize: 18, letterSpacing: 2, color: C.green, marginBottom: 16 }}>ENREGISTRER UN TRADE</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 12 }}>
           <div>
             <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>TICKER</label>
@@ -581,7 +581,7 @@ function JournalTab({ prefillLog, baseCapital }) {
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>OUTCOME</label>
+            <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>RÉSULTAT</label>
             <select className="field-input" value={form.outcome} onChange={e => setForm(f => ({ ...f, outcome: e.target.value }))}>
               <option>WIN</option>
               <option>LOSS</option>
@@ -594,18 +594,18 @@ function JournalTab({ prefillLog, baseCapital }) {
           </div>
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>NOTES (optional)</label>
-          <input className="field-input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="What worked, what didn't..." />
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>NOTES (optionnel)</label>
+          <input className="field-input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Ce qui a marché, ce qui n'a pas..." />
         </div>
         <button className="btn-primary" onClick={addTrade} disabled={!form.ticker || form.pnl === ''}>
-          + ADD TRADE
+          + AJOUTER
         </button>
       </div>
 
       {/* Trade list */}
       {trades.length === 0 ? (
         <div style={{ textAlign: 'center', color: C.muted, fontSize: 12, padding: 40 }}>
-          No trades logged yet. Start trading!
+          Aucun trade enregistré. Commencez à trader !
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -698,12 +698,12 @@ function ProfileTab({ profile, onSave }) {
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '24px 16px' }}>
       <div className="card">
         <div style={{ fontFamily: 'Bebas Neue', fontSize: 22, letterSpacing: 3, color: C.green, marginBottom: 24 }}>
-          TRADER PROFILE
+          PROFIL DU TRADER
         </div>
 
         {/* Name */}
         <div style={{ marginBottom: 18 }}>
-          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>TRADER NAME</label>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>NOM DU TRADER</label>
           <input
             className="field-input"
             value={form.name}
@@ -714,7 +714,7 @@ function ProfileTab({ profile, onSave }) {
 
         {/* Role */}
         <div style={{ marginBottom: 18 }}>
-          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>ROLE</label>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>RÔLE</label>
           <input
             className="field-input"
             value={form.role}
@@ -725,7 +725,7 @@ function ProfileTab({ profile, onSave }) {
 
         {/* Experience */}
         <div style={{ marginBottom: 18 }}>
-          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>EXPERIENCE</label>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>EXPÉRIENCE</label>
           <input
             className="field-input"
             value={form.experience}
@@ -749,7 +749,7 @@ function ProfileTab({ profile, onSave }) {
 
         {/* Markets */}
         <div style={{ marginBottom: 18 }}>
-          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 10 }}>MARKETS</label>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 10 }}>MARCHÉS</label>
           <div style={{ display: 'flex', gap: 10 }}>
             {MARKET_OPTIONS.map(m => (
               <button
@@ -775,7 +775,7 @@ function ProfileTab({ profile, onSave }) {
 
         {/* Trading Styles */}
         <div style={{ marginBottom: 24 }}>
-          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 10 }}>TRADING STYLES</label>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 10 }}>STYLES DE TRADING</label>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {STYLE_OPTIONS.map(s => (
               <button
@@ -801,17 +801,17 @@ function ProfileTab({ profile, onSave }) {
         </div>
 
         <button className="btn-primary" onClick={handleSave} disabled={!isValid} style={{ width: '100%' }}>
-          {saved ? '✓ SAVED' : 'SAVE PROFILE'}
+          {saved ? '✓ SAUVEGARDÉ' : 'SAUVEGARDER'}
         </button>
       </div>
 
       {/* Risk summary */}
       <div style={{ marginTop: 16, padding: 16, border: `1px solid ${C.border}`, background: C.panel }}>
-        <div style={{ fontFamily: 'Bebas Neue', fontSize: 14, letterSpacing: 2, color: C.muted, marginBottom: 12 }}>RISK PARAMETERS</div>
-        <PriceRow label="MAX RISK / TRADE (2%)" value={`$${(form.capital * 0.02).toFixed(2)}`} color={C.yellow} />
-        <PriceRow label="DAILY DRAWDOWN LIMIT (3%)" value={`$${(form.capital * 0.03).toFixed(2)}`} color={C.red} />
-        <PriceRow label="MAX POSITIONS" value="3" color={C.blue} />
-        <PriceRow label="MIN R/R RATIO" value="1:1.5" color={C.green} />
+        <div style={{ fontFamily: 'Bebas Neue', fontSize: 14, letterSpacing: 2, color: C.muted, marginBottom: 12 }}>PARAMÈTRES DE RISQUE</div>
+        <PriceRow label="RISQUE MAX / TRADE (2%)" value={`$${(form.capital * 0.02).toFixed(2)}`} color={C.yellow} />
+        <PriceRow label="LIMITE DRAWDOWN (3%)" value={`$${(form.capital * 0.03).toFixed(2)}`} color={C.red} />
+        <PriceRow label="POSITIONS MAX" value="3" color={C.blue} />
+        <PriceRow label="RATIO R/R MIN" value="1:1.5" color={C.green} />
       </div>
     </div>
   );
@@ -852,7 +852,7 @@ export default function App() {
         <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '12px 0' }}>
             <span style={{ fontFamily: 'Bebas Neue', fontSize: 32, letterSpacing: 6, color: C.green }}>AXIOM</span>
-            <span style={{ fontSize: 10, color: C.muted, letterSpacing: 3 }}>AUTONOMOUS TRADING AGENT</span>
+            <span style={{ fontSize: 10, color: C.muted, letterSpacing: 3 }}>AGENT DE TRADING AUTONOME</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ textAlign: 'right' }}>
@@ -863,23 +863,23 @@ export default function App() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <div className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, marginRight: 8 }} />
-              <span style={{ fontSize: 10, color: C.green, letterSpacing: 2 }}>LIVE</span>
+              <span style={{ fontSize: 10, color: C.green, letterSpacing: 2 }}>EN DIRECT</span>
             </div>
           </div>
         </div>
         {/* Tabs */}
         <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', gap: 4 }}>
           <button className={`tab-btn ${tab === 'hunt' ? 'active' : ''}`} onClick={() => setTab('hunt')}>
-            ◈ HUNT MARKET
+            ◈ CHASSE MARCHÉ
           </button>
           <button className={`tab-btn ${tab === 'dive' ? 'active' : ''}`} onClick={() => setTab('dive')}>
-            ⊕ DEEP DIVE
+            ⊕ ANALYSE
           </button>
           <button className={`tab-btn ${tab === 'journal' ? 'active' : ''}`} onClick={() => setTab('journal')}>
             ◎ JOURNAL
           </button>
           <button className={`tab-btn ${tab === 'profile' ? 'active' : ''}`} onClick={() => setTab('profile')}>
-            ◉ PROFILE
+            ◉ PROFIL
           </button>
         </div>
       </header>
@@ -894,7 +894,7 @@ export default function App() {
 
       {/* Footer */}
       <footer style={{ textAlign: 'center', padding: '24px 16px', color: C.muted, fontSize: 10, letterSpacing: 2, borderTop: `1px solid ${C.border}` }}>
-        AXIOM v1.0 — FOR EDUCATIONAL PURPOSES ONLY. NOT FINANCIAL ADVICE.
+        AXIOM v1.0 — À TITRE ÉDUCATIF UNIQUEMENT. PAS DE CONSEIL FINANCIER.
       </footer>
     </div>
   );
