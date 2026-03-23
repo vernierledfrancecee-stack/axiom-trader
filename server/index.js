@@ -55,12 +55,17 @@ app.post('/api/axiom', async (req, res) => {
     body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }];
   }
 
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), 25_000); // 25s < Railway 30s timeout
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      signal: abort.signal,
     });
+    clearTimeout(timeout);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -69,20 +74,21 @@ app.post('/api/axiom', async (req, res) => {
 
     const data = await response.json();
 
-    // Extract text content from the response
     let textContent = '';
     if (data.content && Array.isArray(data.content)) {
       for (const block of data.content) {
-        if (block.type === 'text') {
-          textContent += block.text;
-        }
+        if (block.type === 'text') textContent += block.text;
       }
     }
 
-    res.json({ content: textContent, raw: data });
+    if (!res.headersSent) res.json({ content: textContent, raw: data });
   } catch (err) {
+    clearTimeout(timeout);
     console.error('Anthropic API error:', err);
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) {
+      const msg = err.name === 'AbortError' ? 'Délai dépassé — réessaie' : err.message;
+      res.status(500).json({ error: msg });
+    }
   }
 });
 
