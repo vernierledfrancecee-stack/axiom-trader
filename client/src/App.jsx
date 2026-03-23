@@ -2,6 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { huntMarket, deepDive } from './api.js';
 import './theme.css';
 
+// ─── Strip <cite> tags from AI responses ──────────────────────────────────────
+const stripCite = (text) =>
+  typeof text === 'string' ? text.replace(/<cite[^>]*>|<\/cite>/g, '') : text;
+
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
   bg: 'var(--bg)',
@@ -251,15 +255,15 @@ function HuntTab({ onDeepDive, defaultCapital, profile }) {
               <span style={{ fontFamily: 'Bebas Neue', fontSize: 22, letterSpacing: 2, color: C.green }}>RÉSUMÉ MARCHÉ</span>
               <Badge label={result.marketCondition} color={conditionColor(result.marketCondition)} />
             </div>
-            <p style={{ color: C.text, fontSize: 12, lineHeight: 1.7, marginBottom: 14 }}>{result.marketBrief}</p>
+            <p style={{ color: C.text, fontSize: 12, lineHeight: 1.7, marginBottom: 14 }}>{stripCite(result.marketBrief)}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
               <div style={{ background: C.bg, padding: 12, border: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>NIVEAU VIX</div>
-                <div style={{ fontSize: 13, color: C.yellow }}>{result.vixLevel}</div>
+                <div style={{ fontSize: 13, color: C.yellow }}>{stripCite(result.vixLevel)}</div>
               </div>
               <div style={{ background: C.bg, padding: 12, border: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>SECTEUR CIBLÉ</div>
-                <div style={{ fontSize: 13, color: C.blue }}>{result.sectorFocus}</div>
+                <div style={{ fontSize: 13, color: C.blue }}>{stripCite(result.sectorFocus)}</div>
               </div>
             </div>
           </div>
@@ -331,19 +335,19 @@ function SetupCard({ setup, onDeepDive, delay }) {
       <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>
         <div style={{ marginBottom: 6 }}>
           <span style={{ color: C.blue, letterSpacing: 1 }}>CATALYSEUR : </span>
-          <span style={{ color: C.text }}>{setup.catalyst}</span>
+          <span style={{ color: C.text }}>{stripCite(setup.catalyst)}</span>
         </div>
         <div style={{ marginBottom: 6 }}>
           <span style={{ color: C.blue, letterSpacing: 1 }}>SETUP : </span>
-          <span style={{ color: C.text }}>{setup.technicalSetup}</span>
+          <span style={{ color: C.text }}>{stripCite(setup.technicalSetup)}</span>
         </div>
         <div style={{ marginBottom: 6 }}>
           <span style={{ color: C.blue, letterSpacing: 1 }}>VOLUME : </span>
-          <span style={{ color: C.text }}>{setup.volumeContext}</span>
+          <span style={{ color: C.text }}>{stripCite(setup.volumeContext)}</span>
         </div>
         <div>
           <span style={{ color: C.red, letterSpacing: 1 }}>INVALIDATION : </span>
-          <span style={{ color: C.text }}>{setup.invalidationNote}</span>
+          <span style={{ color: C.text }}>{stripCite(setup.invalidationNote)}</span>
         </div>
       </div>
 
@@ -465,7 +469,7 @@ function InfoBlock({ label, value, color }) {
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 12, color, lineHeight: 1.7 }}>{value}</div>
+      <div style={{ fontSize: 12, color, lineHeight: 1.7 }}>{stripCite(value)}</div>
     </div>
   );
 }
