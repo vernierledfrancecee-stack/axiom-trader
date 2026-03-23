@@ -1,0 +1,32 @@
+# ============================================================
+# AXIOM — Système de trading autonome
+# Toutes les dépendances Python nécessaires
+# ============================================================
+
+# --- Données de marché (Yahoo Finance, gratuit, sans API key) ---
+yfinance==0.2.54
+pandas==2.2.3
+numpy==2.1.3
+
+# --- Intelligence artificielle (Claude API d'Anthropic) ---
+anthropic==0.49.0
+
+# --- Alertes Telegram ---
+python-telegram-bot==21.10
+
+# --- Dashboard temps réel ---
+streamlit==1.42.2
+plotly==6.0.1
+
+# --- Planificateur de tâches (toutes les 5 minutes) ---
+APScheduler==3.11.0
+
+# --- Indicateurs techniques ---
+ta==0.11.0
+
+# --- Variables d'environnement (.env) ---
+python-dotenv==1.1.0
+
+# --- Utilitaires ---
+requests==2.32.3
+pytz==2025.2
