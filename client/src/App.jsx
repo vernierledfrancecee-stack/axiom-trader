@@ -1031,12 +1031,12 @@ export default function App() {
         </div>
       </header>
 
-      {/* Content */}
+      {/* Content — toujours monté pour préserver l'état et les analyses en cours */}
       <main>
-        {tab === 'hunt' && <HuntTab onDeepDive={handleDeepDive} defaultCapital={profile.capital} profile={profile} />}
-        {tab === 'dive' && <DeepDiveTab prefillTicker={deepDiveTicker} onLogTrade={handleLogTrade} profile={profile} />}
-        {tab === 'journal' && <JournalTab prefillLog={journalPrefill} baseCapital={profile.capital} />}
-        {tab === 'profile' && <ProfileTab profile={profile} onSave={handleSaveProfile} />}
+        <div style={{ display: tab === 'hunt'    ? 'block' : 'none' }}><HuntTab onDeepDive={handleDeepDive} defaultCapital={profile.capital} profile={profile} /></div>
+        <div style={{ display: tab === 'dive'    ? 'block' : 'none' }}><DeepDiveTab prefillTicker={deepDiveTicker} onLogTrade={handleLogTrade} profile={profile} /></div>
+        <div style={{ display: tab === 'journal' ? 'block' : 'none' }}><JournalTab prefillLog={journalPrefill} baseCapital={profile.capital} /></div>
+        <div style={{ display: tab === 'profile' ? 'block' : 'none' }}><ProfileTab profile={profile} onSave={handleSaveProfile} /></div>
       </main>
 
       {/* Footer */}

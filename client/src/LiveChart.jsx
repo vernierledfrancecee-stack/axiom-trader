@@ -62,11 +62,30 @@ export default function LiveChart({ ticker, signal, entryZone, stopLoss, target1
     if (tp2)   series.createPriceLine({ price: tp2,   color: '#00A855', lineWidth: 1, lineStyle: LineStyle.Dotted,  axisLabelVisible: true, title: 'TP2'    });
 
     const ro = new ResizeObserver(() => {
-      if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth });
+      if (containerRef.current && containerRef.current.clientWidth > 0) {
+        chart.applyOptions({ width: containerRef.current.clientWidth });
+      }
     });
     ro.observe(containerRef.current);
 
-    return () => { ro.disconnect(); chart.remove(); chartRef.current = null; seriesRef.current = null; };
+    // Resize + reload quand la fenêtre/onglet redevient visible
+    const onVisible = () => {
+      if (!document.hidden && containerRef.current && containerRef.current.clientWidth > 0) {
+        chart.applyOptions({ width: containerRef.current.clientWidth });
+        chart.timeScale().fitContent();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      ro.disconnect();
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+    };
   }, [entryZone, stopLoss, target1, target2]);
 
   // ── Fetch & update candles ───────────────────────────────────────────────
