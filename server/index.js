@@ -33,33 +33,33 @@ app.post('/api/axiom', async (req, res) => {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
   }
 
-  const { system, user, model } = req.body;
+  const { system, user, model, useWebSearch = false } = req.body;
   if (!user) {
     return res.status(400).json({ error: 'Missing user message' });
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+  };
+  if (useWebSearch) headers['anthropic-beta'] = 'web-search-2025-03-05';
+
+  const body = {
+    model: model || 'claude-haiku-4-5-20251001',
+    max_tokens: 2048,
+    system: system || '',
+    messages: [{ role: 'user', content: user }],
+  };
+  if (useWebSearch) {
+    body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }];
   }
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'web-search-2025-03-05',
-      },
-      body: JSON.stringify({
-        model: model || 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
-        system: system || '',
-        tools: [
-          {
-            type: 'web_search_20250305',
-            name: 'web_search',
-            max_uses: 2,
-          },
-        ],
-        messages: [{ role: 'user', content: user }],
-      }),
+      headers,
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
