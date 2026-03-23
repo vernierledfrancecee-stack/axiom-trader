@@ -2,5 +2,9 @@ node_modules/
 client/node_modules/
 client/dist/
 .env
+axiom/.env
 *.log
 .DS_Store
+__pycache__/
+*.pyc
+axiom/__pycache__/
