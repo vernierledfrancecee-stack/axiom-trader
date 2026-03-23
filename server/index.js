@@ -6,6 +6,26 @@ const PORT = process.env.PORT || 3001;
 
 app.use(express.json());
 
+// GET /api/candles/:ticker — proxy Yahoo Finance OHLCV
+app.get('/api/candles/:ticker', async (req, res) => {
+  const { ticker } = req.params;
+  const { interval = '5m', range = '1d' } = req.query;
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}&includePrePost=false`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const data = await r.json();
+    const result = data.chart?.result?.[0];
+    if (!result) return res.status(404).json({ error: 'Ticker introuvable' });
+    const { timestamp, indicators: { quote: [q] } } = result;
+    const candles = timestamp
+      .map((t, i) => ({ time: t, open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i] }))
+      .filter(c => c.open != null && c.close != null);
+    res.json({ candles });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/axiom — proxy to Anthropic API
 app.post('/api/axiom', async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;

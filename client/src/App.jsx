@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { huntMarket, deepDive } from './api.js';
+import LiveChart from './LiveChart.jsx';
 import './theme.css';
 
 // ─── Strip <cite> tags from AI responses ──────────────────────────────────────
@@ -429,6 +430,16 @@ function DeepDiveTab({ prefillTicker, onLogTrade, profile }) {
               </div>
             </div>
           </div>
+
+          {/* Live chart */}
+          <LiveChart
+            ticker={result.ticker || ticker}
+            signal={result.signal}
+            entryZone={result.entryZone}
+            stopLoss={result.stopLoss}
+            target1={result.target1}
+            target2={result.target2}
+          />
 
           {/* Price levels */}
           <div className="card" style={{ marginBottom: 16 }}>
