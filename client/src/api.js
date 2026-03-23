@@ -77,11 +77,11 @@ RÉPONDS UNIQUEMENT AVEC DU JSON VALIDE — pas de markdown, pas d'explication h
   "warning": "string — risques clés ou points de vigilance"
 }`;
 
-async function callAxiom(system, userMessage, model) {
+async function callAxiom(system, userMessage, model, useWebSearch = false) {
   const res = await fetch('/api/axiom', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system, user: userMessage, model }),
+    body: JSON.stringify({ system, user: userMessage, model, useWebSearch }),
   });
 
   if (!res.ok) {
@@ -105,7 +105,7 @@ export async function huntMarket(capital, mode, profile) {
 
 Utilise la recherche web pour trouver les meilleures opportunités du jour. Trouve 4 setups à forte conviction en respectant toutes les règles. Retourne le JSON.`;
 
-  return callAxiom(system, userMessage, 'claude-sonnet-4-20250514');
+  return callAxiom(system, userMessage, 'claude-sonnet-4-20250514', true);
 }
 
 export async function deepDive(ticker, profile) {
