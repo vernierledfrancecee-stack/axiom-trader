@@ -359,37 +359,100 @@ function SetupCard({ setup, onDeepDive, delay }) {
   );
 }
 
+// ─── History helpers ──────────────────────────────────────────────────────────
+const HISTORY_KEY = 'axiom_history';
+const MAX_HISTORY = 20;
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+}
+function saveHistory(h) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+}
+function addToHistory(ticker, result) {
+  const h = loadHistory();
+  const existing = h.findIndex(x => x.ticker === ticker);
+  const entry = {
+    ticker,
+    signal: result.signal,
+    conviction: result.conviction,
+    entryZone: result.entryZone,
+    stopLoss: result.stopLoss,
+    target1: result.target1,
+    target2: result.target2,
+    riskReward: result.riskReward,
+    starred: existing >= 0 ? h[existing].starred : false,
+    analyzedAt: new Date().toISOString(),
+    result,
+  };
+  if (existing >= 0) h.splice(existing, 1);
+  h.unshift(entry);
+  saveHistory(h.slice(0, MAX_HISTORY));
+  return h.slice(0, MAX_HISTORY);
+}
+function toggleStar(h, ticker) {
+  return h.map(x => x.ticker === ticker ? { ...x, starred: !x.starred } : x);
+}
+function timeAgo(iso) {
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}j`;
+}
+
 // ─── Tab 2: DEEP DIVE ─────────────────────────────────────────────────────────
 function DeepDiveTab({ prefillTicker, onLogTrade, profile }) {
   const [ticker, setTicker] = useState(prefillTicker || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [history, setHistory] = useState(loadHistory);
 
   useEffect(() => {
     if (prefillTicker) setTicker(prefillTicker);
   }, [prefillTicker]);
 
-  const analyze = useCallback(async () => {
-    if (!ticker.trim()) return;
+  const analyze = useCallback(async (t) => {
+    const sym = (t || ticker).trim().toUpperCase();
+    if (!sym) return;
+    setTicker(sym);
     setLoading(true);
     setError(null);
     setResult(null);
     try {
-      const data = await deepDive(ticker.trim(), profile);
+      const data = await deepDive(sym, profile);
       setResult(data);
+      setHistory(addToHistory(sym, data));
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [ticker]);
+  }, [ticker, profile]);
 
   const handleKey = e => { if (e.key === 'Enter') analyze(); };
 
+  const restoreFromHistory = (entry) => {
+    setTicker(entry.ticker);
+    setResult(entry.result);
+    setError(null);
+  };
+
+  const onStar = (t) => {
+    const h = toggleStar(loadHistory(), t);
+    saveHistory(h);
+    setHistory(h);
+  };
+
+  const starred = history.filter(x => x.starred);
+  const recent  = history.filter(x => !x.starred);
+
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+    <div style={{ maxWidth: 760, margin: '0 auto', padding: '24px 16px' }}>
+
+      {/* Search */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         <input
           className="field-input"
           placeholder="Entrer un ticker (ex : NVDA)"
@@ -398,10 +461,34 @@ function DeepDiveTab({ prefillTicker, onLogTrade, profile }) {
           onKeyDown={handleKey}
           style={{ flex: 1, textTransform: 'uppercase', letterSpacing: 2, fontSize: 16 }}
         />
-        <button className="btn-primary" onClick={analyze} disabled={loading || !ticker.trim()}>
-          {loading ? 'ANALYSE EN COURS…' : 'ANALYSER'}
+        <button className="btn-primary" onClick={() => analyze()} disabled={loading || !ticker.trim()}>
+          {loading ? '⏳ ANALYSE…' : 'ANALYSER'}
         </button>
       </div>
+
+      {/* Watchlist (starred) */}
+      {starred.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>⭐ WATCHLIST</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {starred.map(e => (
+              <HistoryChip key={e.ticker} entry={e} onSelect={restoreFromHistory} onStar={onStar} onReanalyze={analyze} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent history */}
+      {recent.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 9, color: C.muted, letterSpacing: 2, marginBottom: 6 }}>RÉCENTS</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {recent.map(e => (
+              <HistoryChip key={e.ticker} entry={e} onSelect={restoreFromHistory} onStar={onStar} onReanalyze={analyze} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading && <Spinner />}
       {error && <ErrorBox message={error} />}
@@ -472,6 +559,51 @@ function DeepDiveTab({ prefillTicker, onLogTrade, profile }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── History chip ─────────────────────────────────────────────────────────────
+function HistoryChip({ entry, onSelect, onStar, onReanalyze }) {
+  const sigColor = entry.signal === 'LONG' ? C.green : entry.signal === 'SHORT' ? C.red : C.muted;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 5,
+      padding: '4px 8px', border: `1px solid ${C.border}`,
+      background: C.panel, cursor: 'pointer', userSelect: 'none',
+    }}>
+      {/* Ticker — click to restore cached result */}
+      <span
+        onClick={() => onSelect(entry)}
+        style={{ fontFamily: 'Bebas Neue', fontSize: 14, letterSpacing: 1, color: C.text }}
+      >
+        {entry.ticker}
+      </span>
+
+      {/* Signal dot */}
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: sigColor, display: 'inline-block' }} />
+
+      {/* Conviction */}
+      <span style={{ fontSize: 9, color: sigColor, letterSpacing: 1 }}>{entry.conviction}%</span>
+
+      {/* Time ago */}
+      <span style={{ fontSize: 9, color: C.muted }}>{timeAgo(entry.analyzedAt)}</span>
+
+      {/* Re-analyze */}
+      <span
+        onClick={() => onReanalyze(entry.ticker)}
+        title="Ré-analyser"
+        style={{ fontSize: 10, color: C.muted, cursor: 'pointer', padding: '0 2px' }}
+      >↻</span>
+
+      {/* Star */}
+      <span
+        onClick={() => onStar(entry.ticker)}
+        title={entry.starred ? 'Retirer watchlist' : 'Ajouter watchlist'}
+        style={{ fontSize: 12, cursor: 'pointer', color: entry.starred ? C.yellow : C.muted }}
+      >
+        {entry.starred ? '★' : '☆'}
+      </span>
     </div>
   );
 }

@@ -33,7 +33,7 @@ app.post('/api/axiom', async (req, res) => {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
   }
 
-  const { system, user } = req.body;
+  const { system, user, model } = req.body;
   if (!user) {
     return res.status(400).json({ error: 'Missing user message' });
   }
@@ -48,8 +48,8 @@ app.post('/api/axiom', async (req, res) => {
         'anthropic-beta': 'web-search-2025-03-05',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        model: model || 'claude-haiku-4-5-20251001',
+        max_tokens: 1500,
         system: system || '',
         tools: [
           {
