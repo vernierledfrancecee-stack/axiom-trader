@@ -89,11 +89,32 @@ async function callAxiom(system, userMessage, model, useWebSearch = false) {
     throw new Error(err.error || 'API call failed');
   }
 
-  const data = await res.json();
-  const text = data.content || '';
+  // Read SSE stream and accumulate text
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+  let buffer = '';
 
-  // Extract JSON from response
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // keep incomplete line
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (!data) continue;
+      try {
+        const event = JSON.parse(data);
+        if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+          fullText += event.delta.text;
+        }
+      } catch {}
+    }
+  }
+
+  const jsonMatch = fullText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('No JSON found in response');
   return JSON.parse(jsonMatch[0]);
 }

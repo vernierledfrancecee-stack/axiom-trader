@@ -55,39 +55,39 @@ app.post('/api/axiom', async (req, res) => {
     body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }];
   }
 
-  const abort = new AbortController();
-  const timeout = setTimeout(() => abort.abort(), 25_000); // 25s < Railway 30s timeout
+  // Stream response to avoid Railway 30s timeout
+  body.stream = true;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      signal: abort.signal,
     });
-    clearTimeout(timeout);
 
     if (!response.ok) {
       const errorText = await response.text();
       return res.status(response.status).json({ error: errorText });
     }
 
-    const data = await response.json();
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
 
-    let textContent = '';
-    if (data.content && Array.isArray(data.content)) {
-      for (const block of data.content) {
-        if (block.type === 'text') textContent += block.text;
-      }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(decoder.decode(value, { stream: true }));
     }
 
-    if (!res.headersSent) res.json({ content: textContent, raw: data });
+    res.end();
   } catch (err) {
-    clearTimeout(timeout);
     console.error('Anthropic API error:', err);
     if (!res.headersSent) {
-      const msg = err.name === 'AbortError' ? 'Délai dépassé — réessaie' : err.message;
-      res.status(500).json({ error: msg });
+      res.status(500).json({ error: err.message });
     }
   }
 });
