@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, LineStyle } from 'lightweight-charts';
+import { createChart, CandlestickSeries, LineStyle } from 'lightweight-charts';
 
 // Parse "$52-54" → 53, "$58" → 58
 function parsePrice(str) {
@@ -39,7 +39,7 @@ export default function LiveChart({ ticker, signal, entryZone, stopLoss, target1
       timeScale: { borderColor: '#CBD5E1', timeVisible: true, secondsVisible: false },
     });
 
-    const series = chart.addCandlestickSeries({
+    const series = chart.addSeries(CandlestickSeries, {
       upColor:       '#00A855',
       downColor:     '#E53E3E',
       borderVisible: false,
