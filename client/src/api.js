@@ -126,7 +126,7 @@ export async function huntMarket(capital, mode, profile) {
 
 Utilise la recherche web pour trouver les meilleures opportunités du jour. Trouve 4 setups à forte conviction en respectant toutes les règles. Retourne le JSON.`;
 
-  return callAxiom(system, userMessage, 'claude-sonnet-4-20250514', true);
+  return callAxiom(system, userMessage, 'claude-sonnet-4-6', true);
 }
 
 export async function deepDive(ticker, profile) {
