@@ -47,7 +47,7 @@ app.post('/api/axiom', async (req, res) => {
 
   const body = {
     model: model || 'claude-haiku-4-5-20251001',
-    max_tokens: 2048,
+    max_tokens: 4096,
     system: system || '',
     messages: [{ role: 'user', content: user }],
   };
