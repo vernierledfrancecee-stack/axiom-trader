@@ -6,6 +6,7 @@
 const cron = require('node-cron');
 const { sendAlert, sendSignal } = require('./telegram');
 const { getFundamentals } = require('./fundamental');
+const { saveSignal } = require('./signalStore');
 
 // Watchlist identique au client — 28 grandes caps liquides S&P500/NASDAQ
 const WATCHLIST = [
@@ -298,6 +299,8 @@ Trouve 3-4 setups à forte conviction en respectant toutes les règles. Retourne
     } catch (err) {
       console.warn(`[CRON] Fondamentaux ${signal.ticker} indisponibles:`, err.message);
     }
+    // Sauvegarder dans le store pour que le bot puisse retrouver stop/TP
+    saveSignal(signal);
     await sendSignal(signal);
     // Petit délai pour éviter le rate limiting Telegram
     await new Promise(r => setTimeout(r, 500));
