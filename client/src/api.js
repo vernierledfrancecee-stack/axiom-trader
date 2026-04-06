@@ -140,13 +140,34 @@ async function fetchCurrentPrice(ticker) {
 }
 
 /**
- * Parse un prix depuis une chaîne ("$121.50 - $123" → 122.25)
+ * Parse un prix depuis une chaîne ("$121.50 - $123" → 122.25, "$595" → 595)
+ * Priorité : plage → premier $ → premier nombre
  */
 function parsePrice(str) {
   if (!str) return null;
-  const nums = (String(str).match(/[\d.]+/g) || []).map(Number).filter(Boolean);
-  if (!nums.length) return null;
-  return nums.reduce((a, b) => a + b, 0) / nums.length;
+  const s = String(str);
+  // Plage : "$595-600" ou "595 - 600" ou "$595–$600"
+  const rangeMatch = s.match(/\$?([\d,]+\.?\d*)\s*[-–]\s*\$?([\d,]+\.?\d*)/);
+  if (rangeMatch) {
+    const low = parseFloat(rangeMatch[1].replace(',', ''));
+    const high = parseFloat(rangeMatch[2].replace(',', ''));
+    if (!isNaN(low) && !isNaN(high) && high > low && high < low * 1.5) {
+      return (low + high) / 2;
+    }
+  }
+  // Premier prix précédé de $
+  const priceMatch = s.match(/\$\s*([\d,]+\.?\d+)/);
+  if (priceMatch) {
+    const val = parseFloat(priceMatch[1].replace(',', ''));
+    if (!isNaN(val) && val > 0) return val;
+  }
+  // Premier nombre dans la chaîne
+  const firstNum = s.match(/([\d,]+\.?\d+)/);
+  if (firstNum) {
+    const val = parseFloat(firstNum[1].replace(',', ''));
+    if (!isNaN(val) && val > 0) return val;
+  }
+  return null;
 }
 
 /**
@@ -199,15 +220,47 @@ async function validateSetupsWithLivePrices(result) {
   return { ...result, bestSetups: validated };
 }
 
+// Watchlist de 28 actions liquides S&P500/NASDAQ (grandes capitalisations uniquement)
+const WATCHLIST = [
+  'AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN', 'META', 'GOOGL', 'NFLX',
+  'AMD', 'INTC', 'QCOM', 'AVGO',
+  'JPM', 'BAC', 'GS', 'V', 'MA',
+  'XOM', 'CVX',
+  'UNH', 'LLY', 'JNJ',
+  'BA', 'CAT', 'GE',
+  'SPY', 'QQQ', 'GLD',
+];
+
 export async function huntMarket(capital, mode, profile) {
   const profileCtx = buildProfileContext(profile);
+
+  // Pré-charger les prix réels de la watchlist
+  const priceMap = {};
+  await Promise.all(
+    WATCHLIST.map(async (ticker) => {
+      const price = await fetchCurrentPrice(ticker);
+      if (price) priceMap[ticker] = price;
+    })
+  );
+
+  // Construire la table des prix pour le prompt
+  const priceTable = WATCHLIST
+    .filter(t => priceMap[t])
+    .map(t => `${t}:$${priceMap[t].toFixed(2)}`)
+    .join(' | ');
+
   const system = HUNTER_SYSTEM + profileCtx;
   const userMessage = `Scanne le marché MAINTENANT. Capital disponible : $${capital}. Mode : ${mode}.
 
-Utilise la recherche web pour trouver les meilleures opportunités du jour.
-IMPORTANT : Pour chaque setup, vérifie que le prix d'entrée correspond au prix ACTUEL du titre.
-Si le titre a déjà bougé loin de la zone d'entrée, marque setupStatus = "EN ATTENTE" ou "INVALIDE".
-Trouve 4 setups à forte conviction en respectant toutes les règles. Retourne le JSON.`;
+WATCHLIST AUTORISÉE — tu dois choisir UNIQUEMENT parmi ces titres :
+${priceTable}
+
+Ces prix sont RÉELS et datent de moins de 2 minutes. Tu DOIS utiliser ces prix comme base pour tes zones d'entrée.
+La zone d'entrée doit être à ±2% maximum du prix fourni.
+
+Utilise la recherche web pour identifier les catalyseurs, actualités et momentum du jour sur ces titres.
+Sélectionne les 4 meilleurs setups parmi la watchlist, avec des niveaux cohérents avec les prix ci-dessus.
+Retourne le JSON.`;
 
   const result = await callAxiom(system, userMessage, 'claude-sonnet-4-6', true);
 
