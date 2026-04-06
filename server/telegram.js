@@ -49,7 +49,8 @@ function initBot(enablePolling = false) {
 function setupPollingHandlers() {
   if (!bot) return;
 
-  const { getActiveTrades, closeTrade } = require('./tradeTracker');
+  const { getActiveTrades, closeTrade, openTrade } = require('./tradeTracker');
+  const { getSignal, getAllSignals } = require('./signalStore');
 
   bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
@@ -119,12 +120,129 @@ function setupPollingHandlers() {
       return;
     }
 
-    // "acheté {ticker}" ou "bought {ticker}"
-    const buyMatch = text.match(/(?:acheté|bought)\s+([A-Z]{1,6})/i);
-    if (buyMatch) {
-      const ticker = buyMatch[1].toUpperCase();
+    // ─── "pris TICKER [prix] [qté]" — ouvre un trade ───────────────────────
+    // Exemples : "pris GLD", "pris GLD 428", "pris GLD 428.50 10"
+    const prisMatch = text.match(/^pris\s+([A-Z]{1,6})(?:\s+([\d.,]+))?(?:\s+(\d+))?/i);
+    if (prisMatch) {
+      const ticker = prisMatch[1].toUpperCase();
+      const prixManuel = prisMatch[2] ? parseFloat(prisMatch[2].replace(',', '.')) : null;
+      const qtyManuelle = prisMatch[3] ? parseInt(prisMatch[3]) : null;
+
+      try {
+        // Récupérer le signal correspondant
+        const signal = getSignal(ticker);
+        if (!signal) {
+          await bot.sendMessage(chatId,
+            `⚠️ Aucun signal récent pour <b>${ticker}</b>.\nFais d'abord un scan ou utilise :\n<code>pris ${ticker} PRIX QTÉ STOP TP1</code>`,
+            { parse_mode: 'HTML' }
+          );
+          return;
+        }
+
+        const entree = prixManuel || parseFloat(signal.entree);
+        const stop = parseFloat(signal.stop);
+        const tp1 = parseFloat(signal.tp1);
+        const tp2 = parseFloat(signal.tp2);
+        const direction = signal.direction || 'LONG';
+
+        // Calcul automatique de la quantité si non fournie (risque 2% du capital)
+        let quantite = qtyManuelle;
+        if (!quantite) {
+          const capital = parseFloat(process.env.CAPITAL_INITIAL || 5000);
+          const risqueParAction = Math.abs(entree - stop);
+          if (risqueParAction > 0) {
+            quantite = Math.max(1, Math.floor((capital * 0.02) / risqueParAction));
+          } else {
+            quantite = 1;
+          }
+        }
+
+        await openTrade({ ticker, direction, entree, stop, tp1, tp2, rr: signal.rr, quantite });
+
+        const mult = direction === 'SHORT' ? -1 : 1;
+        const risqueTotal = Math.abs(entree - stop) * quantite;
+        const potentielTP1 = Math.abs(tp1 - entree) * quantite;
+
+        await bot.sendMessage(chatId,
+          `✅ <b>Trade enregistré — ${ticker} ${direction}</b>\n\n` +
+          `💰 Entrée : <b>$${entree.toFixed(2)}</b> × ${quantite} actions\n` +
+          `🛑 Stop : $${stop.toFixed(2)} (risque max : <b>${risqueTotal.toFixed(0)}€</b>)\n` +
+          `🎯 TP1 : $${tp1.toFixed(2)} (potentiel : <b>+${potentielTP1.toFixed(0)}€</b>)\n` +
+          `🎯 TP2 : $${tp2 ? tp2.toFixed(2) : '?'}\n\n` +
+          `📡 Surveillance active — alertes automatiques stop/TP toutes les 15s`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (err) {
+        await bot.sendMessage(chatId, `❌ Erreur ouverture trade ${ticker}: ${err.message}`);
+      }
+      return;
+    }
+
+    // ─── "vendu TICKER [prix]" — ferme un trade ─────────────────────────────
+    // Exemples : "vendu GLD", "vendu GLD 432.50"
+    const venduMatch = text.match(/^vendu\s+([A-Z]{1,6})(?:\s+([\d.,]+))?/i);
+    if (venduMatch) {
+      const ticker = venduMatch[1].toUpperCase();
+      const prixSortie = venduMatch[2] ? parseFloat(venduMatch[2].replace(',', '.')) : null;
+
+      try {
+        const trades = getActiveTrades();
+        if (!trades[ticker]) {
+          await bot.sendMessage(chatId, `❌ Aucun trade actif sur <b>${ticker}</b>.`, { parse_mode: 'HTML' });
+          return;
+        }
+
+        const prix = prixSortie || trades[ticker].prixActuel;
+        const result = await closeTrade(ticker, prix, 'Fermé manuellement via Telegram');
+
+        const emoji = result.pnl >= 0 ? '✅' : '🔴';
+        await bot.sendMessage(chatId,
+          `${emoji} <b>Trade clôturé — ${ticker}</b>\n\n` +
+          `Sortie : $${result.prixSortie.toFixed(2)}\n` +
+          `P&L : <b>${result.pnl >= 0 ? '+' : ''}${result.pnl.toFixed(2)}€</b> (${result.pnlPct >= 0 ? '+' : ''}${result.pnlPct.toFixed(2)}%)\n` +
+          `Durée : ${result.dureeMinutes} min\n\n` +
+          `📋 <i>${result.rapport}</i>`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (err) {
+        await bot.sendMessage(chatId, `❌ Erreur fermeture ${ticker}: ${err.message}`);
+      }
+      return;
+    }
+
+    // ─── "/signaux" — liste les signaux disponibles ──────────────────────────
+    if (text === '/signaux') {
+      const signaux = getAllSignals();
+      if (!signaux.length) {
+        await bot.sendMessage(chatId, '📭 Aucun signal récent. Lance un scan d\'abord.');
+        return;
+      }
+      const lines = ['📋 <b>Signaux disponibles :</b>\n'];
+      for (const s of signaux) {
+        lines.push(`• <b>${s.ticker}</b> ${s.direction} | Entrée: $${s.entree} | Stop: $${s.stop} | TP1: $${s.tp1}`);
+        lines.push(`  → Réponds <code>pris ${s.ticker}</code> pour l'enregistrer`);
+      }
+      await bot.sendMessage(chatId, lines.join('\n'), { parse_mode: 'HTML' });
+      return;
+    }
+
+    // ─── "/aide" — affiche les commandes ─────────────────────────────────────
+    if (text === '/aide' || text === '/help') {
       await bot.sendMessage(chatId,
-        `✅ Confirmation reçue pour <b>${ticker}</b>.\nUtilise l'interface AXIOM ou POST /api/trade/open pour enregistrer les détails du trade.`,
+        `🤖 <b>AXIOM — Commandes disponibles</b>\n\n` +
+        `<b>Signaux :</b>\n` +
+        `• <code>/signaux</code> — voir les derniers signaux\n\n` +
+        `<b>Ouvrir un trade :</b>\n` +
+        `• <code>pris GLD</code> — entrée auto au prix du signal\n` +
+        `• <code>pris GLD 428</code> — entrée à $428, qté auto\n` +
+        `• <code>pris GLD 428 10</code> — entrée $428, 10 actions\n\n` +
+        `<b>Fermer un trade :</b>\n` +
+        `• <code>vendu GLD</code> — sortie au prix actuel\n` +
+        `• <code>vendu GLD 435</code> — sortie à $435\n\n` +
+        `<b>Portfolio :</b>\n` +
+        `• <code>/status</code> — résumé P&L\n` +
+        `• <code>/trades</code> — trades actifs\n` +
+        `• <code>/stop TICKER</code> — fermer un trade`,
         { parse_mode: 'HTML' }
       );
       return;
