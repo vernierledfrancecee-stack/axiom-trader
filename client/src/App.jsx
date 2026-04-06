@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { huntMarket, deepDive } from './api.js';
 import LiveChart from './LiveChart.jsx';
+import NewsPanel from './components/NewsPanel.jsx';
+import TradePanel from './components/TradePanel.jsx';
+import Dashboard from './components/Dashboard.jsx';
 import './theme.css';
 
 // ─── Strip <cite> tags from AI responses ──────────────────────────────────────
@@ -968,7 +971,7 @@ function ProfileTab({ profile, onSave }) {
 export default function App() {
   injectGlobalCSS();
 
-  const [tab, setTab] = useState('hunt');
+  const [tab, setTab] = useState('dashboard');
   const [deepDiveTicker, setDeepDiveTicker] = useState('');
   const [journalPrefill, setJournalPrefill] = useState(null);
   const [profile, setProfile] = useState(() => {
@@ -976,6 +979,9 @@ export default function App() {
     saveProfile(p);
     return p;
   });
+
+  // Watchlist extraite du profil pour le panneau News
+  const watchlist = profile.watchlist || [];
 
   const handleSaveProfile = useCallback(updated => {
     saveProfile(updated);
@@ -999,7 +1005,7 @@ export default function App() {
         <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, padding: '12px 0' }}>
             <span style={{ fontFamily: 'Bebas Neue', fontSize: 32, letterSpacing: 6, color: C.green }}>AXIOM</span>
-            <span style={{ fontSize: 10, color: C.muted, letterSpacing: 3 }}>AGENT DE TRADING AUTONOME</span>
+            <span style={{ fontSize: 10, color: C.muted, letterSpacing: 3 }}>AGENT DE TRADING AUTONOME v2.0</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ textAlign: 'right' }}>
@@ -1014,34 +1020,46 @@ export default function App() {
             </div>
           </div>
         </div>
-        {/* Tabs */}
-        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', gap: 4 }}>
+        {/* Tabs — tous montés pour ne pas perdre les états */}
+        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', gap: 0, overflowX: 'auto' }}>
+          <button className={`tab-btn ${tab === 'dashboard' ? 'active' : ''}`} onClick={() => setTab('dashboard')}>
+            ▤ DASHBOARD
+          </button>
           <button className={`tab-btn ${tab === 'hunt' ? 'active' : ''}`} onClick={() => setTab('hunt')}>
             ◈ CHASSE MARCHÉ
           </button>
           <button className={`tab-btn ${tab === 'dive' ? 'active' : ''}`} onClick={() => setTab('dive')}>
             ⊕ ANALYSE
           </button>
+          <button className={`tab-btn ${tab === 'trades' ? 'active' : ''}`} onClick={() => setTab('trades')}>
+            ◆ TRADES
+          </button>
+          <button className={`tab-btn ${tab === 'news' ? 'active' : ''}`} onClick={() => setTab('news')}>
+            ◎ ACTUALITÉS
+          </button>
           <button className={`tab-btn ${tab === 'journal' ? 'active' : ''}`} onClick={() => setTab('journal')}>
-            ◎ JOURNAL
+            ◉ JOURNAL
           </button>
           <button className={`tab-btn ${tab === 'profile' ? 'active' : ''}`} onClick={() => setTab('profile')}>
-            ◉ PROFIL
+            ◈ PROFIL
           </button>
         </div>
       </header>
 
       {/* Content — toujours monté pour préserver l'état et les analyses en cours */}
       <main>
+        <div style={{ display: tab === 'dashboard' ? 'block' : 'none' }}><Dashboard /></div>
         <div style={{ display: tab === 'hunt'    ? 'block' : 'none' }}><HuntTab onDeepDive={handleDeepDive} defaultCapital={profile.capital} profile={profile} /></div>
         <div style={{ display: tab === 'dive'    ? 'block' : 'none' }}><DeepDiveTab prefillTicker={deepDiveTicker} onLogTrade={handleLogTrade} profile={profile} /></div>
+        <div style={{ display: tab === 'trades'  ? 'block' : 'none' }}><TradePanel /></div>
+        <div style={{ display: tab === 'news'    ? 'block' : 'none' }}><NewsPanel watchlist={watchlist} /></div>
         <div style={{ display: tab === 'journal' ? 'block' : 'none' }}><JournalTab prefillLog={journalPrefill} baseCapital={profile.capital} /></div>
         <div style={{ display: tab === 'profile' ? 'block' : 'none' }}><ProfileTab profile={profile} onSave={handleSaveProfile} /></div>
       </main>
 
       {/* Footer */}
       <footer style={{ textAlign: 'center', padding: '24px 16px', color: C.muted, fontSize: 10, letterSpacing: 2, borderTop: `1px solid ${C.border}` }}>
-        AXIOM v1.0 — À TITRE ÉDUCATIF UNIQUEMENT. PAS DE CONSEIL FINANCIER.
+        AXIOM v2.0 — À TITRE ÉDUCATIF UNIQUEMENT. PAS DE CONSEIL FINANCIER.
       </footer>
     </div>
   );
