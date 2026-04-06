@@ -6,6 +6,7 @@ PROFIL DU TRADER : ${profile.name} — ${profile.experience} d'expérience en tr
 
 const RULES = `Marcus Reid, trader institutionnel 20 ans NYSE/NASDAQ. Français uniquement. Froid, factuel.
 R1:stop-loss obligatoire R2:R/R≥1:1.5 R3:max 2% capital R4:max 3 positions R5:drawdown>3%→stop R6:2 indicateurs min R7:volume confirme prix
+R8:CRITIQUE — l'entrée DOIT être proche du prix actuel (max 3% d'écart). Si le prix actuel est déjà loin de la zone d'entrée, baisser la conviction ou marquer EN ATTENTE.
 JSON VALIDE UNIQUEMENT:`;
 
 const HUNTER_SYSTEM = RULES + `
@@ -21,7 +22,9 @@ const HUNTER_SYSTEM = RULES + `
       "direction": "LONG" | "SHORT",
       "timeframe": "SCALP" | "DAY TRADE" | "SWING 24H" | "SWING 48H",
       "conviction": number (0-100),
-      "entryZone": "string — zone de prix",
+      "prixActuel": "string — prix actuel du titre au moment du scan",
+      "entryZone": "string — zone de prix PROCHE du prix actuel",
+      "setupStatus": "IMMÉDIAT" | "EN ATTENTE" | "INVALIDE",
       "stopLoss": "string — niveau de stop",
       "target1": "string — premier objectif",
       "target2": "string — deuxième objectif",
@@ -63,6 +66,8 @@ RÉPONDS UNIQUEMENT AVEC DU JSON VALIDE — pas de markdown, pas d'explication h
   "signal": "LONG" | "SHORT" | "NO TRADE",
   "timeframe": "SCALP" | "DAY TRADE" | "SWING 24H" | "SWING 48H",
   "conviction": number (0-100),
+  "prixActuel": "string — prix actuel au moment de l'analyse",
+  "setupStatus": "IMMÉDIAT" | "EN ATTENTE" | "INVALIDE",
   "entryZone": "string",
   "stopLoss": "string",
   "target1": "string",
@@ -89,7 +94,6 @@ async function callAxiom(system, userMessage, model, useWebSearch = false) {
     throw new Error(err.error || 'API call failed');
   }
 
-  // Read SSE stream and accumulate text
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let fullText = '';
@@ -100,7 +104,7 @@ async function callAxiom(system, userMessage, model, useWebSearch = false) {
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split('\n');
-    buffer = lines.pop(); // keep incomplete line
+    buffer = lines.pop();
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue;
       const data = line.slice(6).trim();
@@ -119,14 +123,96 @@ async function callAxiom(system, userMessage, model, useWebSearch = false) {
   return JSON.parse(jsonMatch[0]);
 }
 
+/**
+ * Récupère le prix actuel d'un ticker.
+ */
+async function fetchCurrentPrice(ticker) {
+  try {
+    const r = await fetch(`/api/candles/${ticker}?interval=1m&range=1d`);
+    if (!r.ok) return null;
+    const data = await r.json();
+    const candles = data.candles || [];
+    if (!candles.length) return null;
+    return candles[candles.length - 1].close;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse un prix depuis une chaîne ("$121.50 - $123" → 122.25)
+ */
+function parsePrice(str) {
+  if (!str) return null;
+  const nums = (String(str).match(/[\d.]+/g) || []).map(Number).filter(Boolean);
+  if (!nums.length) return null;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+/**
+ * Valide les setups Hunt Market contre les prix actuels.
+ * Ajoute prixActuelLive, ecartPct et met à jour setupStatus si nécessaire.
+ */
+async function validateSetupsWithLivePrices(result) {
+  if (!result?.bestSetups?.length) return result;
+
+  const validated = await Promise.all(
+    result.bestSetups.map(async (setup) => {
+      const livePrice = await fetchCurrentPrice(setup.ticker);
+      if (!livePrice) return setup;
+
+      const entree = parsePrice(setup.entryZone);
+      let ecartPct = null;
+      let newStatus = setup.setupStatus;
+      let newConviction = setup.conviction;
+
+      if (entree) {
+        ecartPct = ((livePrice - entree) / entree) * 100;
+        const absEcart = Math.abs(ecartPct);
+
+        // Prix déjà loin de la zone d'entrée
+        if (absEcart > 5) {
+          newStatus = 'INVALIDE';
+          newConviction = Math.min(newConviction, 20);
+        } else if (absEcart > 2) {
+          newStatus = 'EN ATTENTE';
+          newConviction = Math.min(newConviction, 50);
+        } else {
+          newStatus = newStatus || 'IMMÉDIAT';
+        }
+      }
+
+      return {
+        ...setup,
+        prixActuelLive: livePrice,
+        ecartPct: ecartPct !== null ? parseFloat(ecartPct.toFixed(2)) : null,
+        setupStatus: newStatus,
+        conviction: newConviction,
+      };
+    })
+  );
+
+  // Trier : IMMÉDIAT en premier, INVALIDE en dernier
+  const order = { 'IMMÉDIAT': 0, 'EN ATTENTE': 1, 'INVALIDE': 2 };
+  validated.sort((a, b) => (order[a.setupStatus] ?? 1) - (order[b.setupStatus] ?? 1));
+
+  return { ...result, bestSetups: validated };
+}
+
 export async function huntMarket(capital, mode, profile) {
   const profileCtx = buildProfileContext(profile);
   const system = HUNTER_SYSTEM + profileCtx;
   const userMessage = `Scanne le marché MAINTENANT. Capital disponible : $${capital}. Mode : ${mode}.
 
-Utilise la recherche web pour trouver les meilleures opportunités du jour. Trouve 4 setups à forte conviction en respectant toutes les règles. Retourne le JSON.`;
+Utilise la recherche web pour trouver les meilleures opportunités du jour.
+IMPORTANT : Pour chaque setup, vérifie que le prix d'entrée correspond au prix ACTUEL du titre.
+Si le titre a déjà bougé loin de la zone d'entrée, marque setupStatus = "EN ATTENTE" ou "INVALIDE".
+Trouve 4 setups à forte conviction en respectant toutes les règles. Retourne le JSON.`;
 
-  return callAxiom(system, userMessage, 'claude-sonnet-4-6', true);
+  const result = await callAxiom(system, userMessage, 'claude-sonnet-4-6', true);
+
+  // Validation live des prix après la réponse IA
+  return validateSetupsWithLivePrices(result);
 }
 
 export async function deepDive(ticker, profile) {

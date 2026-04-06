@@ -298,16 +298,49 @@ function HuntTab({ onDeepDive, defaultCapital, profile }) {
 }
 
 function SetupCard({ setup, onDeepDive, delay }) {
+  const isInvalide = setup.setupStatus === 'INVALIDE';
+  const isEnAttente = setup.setupStatus === 'EN ATTENTE';
+  const statusColor = isInvalide ? C.red : isEnAttente ? C.yellow : C.green;
+  const statusLabel = setup.setupStatus || 'IMMÉDIAT';
+
   return (
     <div
       className="card fadeUp"
-      style={{ animationDelay: `${delay}ms`, animationFillMode: 'both', opacity: 0 }}
+      style={{
+        animationDelay: `${delay}ms`, animationFillMode: 'both', opacity: 0,
+        borderColor: isInvalide ? C.red + '44' : isEnAttente ? C.yellow + '44' : undefined,
+      }}
     >
+      {/* Bandeau statut prix */}
+      {setup.setupStatus && (
+        <div style={{
+          margin: '-20px -20px 12px -20px',
+          padding: '6px 16px',
+          background: statusColor + '18',
+          borderBottom: `1px solid ${statusColor}33`,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 10, color: statusColor, letterSpacing: 2, fontWeight: 700 }}>
+            {isInvalide ? '✗' : isEnAttente ? '◷' : '✓'} {statusLabel}
+          </span>
+          {setup.prixActuelLive && (
+            <span style={{ fontSize: 11, color: C.text }}>
+              Prix live : <strong>${setup.prixActuelLive.toFixed(2)}</strong>
+              {setup.ecartPct !== null && (
+                <span style={{ color: Math.abs(setup.ecartPct) > 3 ? C.red : C.muted, marginLeft: 6 }}>
+                  ({setup.ecartPct > 0 ? '+' : ''}{setup.ecartPct}% vs entrée)
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: C.text, letterSpacing: 2 }}>
+            <span style={{ fontFamily: 'Bebas Neue', fontSize: 28, color: isInvalide ? C.muted : C.text, letterSpacing: 2 }}>
               {setup.ticker}
             </span>
             <span style={{ fontFamily: 'Bebas Neue', fontSize: 14, color: C.muted }}>#{setup.rank}</span>
@@ -326,8 +359,19 @@ function SetupCard({ setup, onDeepDive, delay }) {
         </div>
       </div>
 
+      {/* Alerte si invalide */}
+      {isInvalide && (
+        <div style={{
+          padding: '8px 10px', marginBottom: 10,
+          background: C.red + '11', border: `1px solid ${C.red}33`,
+          fontSize: 11, color: C.red,
+        }}>
+          ⚠ Le prix actuel est trop loin de la zone d'entrée — setup non actionnable maintenant.
+        </div>
+      )}
+
       {/* Price levels */}
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, opacity: isInvalide ? 0.5 : 1 }}>
         <PriceRow label="ZONE D'ENTRÉE" value={setup.entryZone} color={C.blue} />
         <PriceRow label="STOP LOSS" value={setup.stopLoss} color={C.red} />
         <PriceRow label="OBJECTIF 1" value={setup.target1} color={C.green} />
