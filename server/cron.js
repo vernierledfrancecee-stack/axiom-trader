@@ -284,7 +284,7 @@ Trouve 3-4 setups à forte conviction en respectant toutes les règles. Retourne
 
   // Résumé de marché
   if (result.marketBrief) {
-    await sendAlert(`📊 <b>AXIOM — Scan 09h25 EST</b>\n\n${result.marketBrief}\n<b>Condition :</b> ${result.marketCondition} | <b>VIX :</b> ${result.vixLevel}\n<b>Secteur :</b> ${result.sectorFocus}\n\n🔍 <b>${signals.length} setup(s) détecté(s)...</b>`);
+    await sendAlert(`📊 <b>AXIOM — Scan pré-ouverture</b>\n\n${result.marketBrief}\n<b>Condition :</b> ${result.marketCondition} | <b>VIX :</b> ${result.vixLevel}\n<b>Secteur :</b> ${result.sectorFocus}\n\n🔍 <b>${signals.length} setup(s) détecté(s)...</b>\n\n⏳ Marché ouvre dans 30 min — surveille les zones d'entrée`);
   }
 
   // Enrichir les signaux avec les données fondamentales
@@ -310,24 +310,93 @@ Trouve 3-4 setups à forte conviction en respectant toutes les règles. Retourne
   return { success: true, signals: signals.length, setups: signals, marketCondition: result.marketCondition };
 }
 
+// Suivi des alertes de proximité déjà envoyées (éviter le spam)
+// clé : "TICKER-session" (session = date du jour)
+const proximityAlertsSent = new Set();
+
 /**
- * Initialise le job CRON — 09h25 EST, lundi-vendredi.
+ * Vérifie si les signaux stockés approchent de leur zone d'entrée.
+ * Envoie une alerte Telegram si le prix est à ≤ 0.8% de l'entrée.
+ */
+async function checkProximityAlerts() {
+  const { getAllSignals } = require('./signalStore');
+  const signals = getAllSignals();
+  if (!signals.length) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const signal of signals) {
+    const alertKey = `${signal.ticker}-${today}`;
+    if (proximityAlertsSent.has(alertKey)) continue;
+
+    try {
+      const prix = await fetchLivePrice(signal.ticker);
+      if (!prix) continue;
+
+      const entree = parseFloat(signal.entree);
+      if (!entree) continue;
+
+      const ecartPct = Math.abs((prix - entree) / entree) * 100;
+
+      // Alerte si prix dans un rayon de 0.8% de la zone d'entrée
+      if (ecartPct <= 0.8) {
+        const direction = signal.direction || 'LONG';
+        const emojiDir = direction === 'LONG' ? '📈' : '📉';
+        const sens = prix < entree ? 'approche par le bas' : 'approche par le haut';
+
+        await sendAlert(
+          `⚡ <b>ZONE D'ENTRÉE ATTEINTE — ${signal.ticker}</b>\n\n` +
+          `${emojiDir} ${direction} | ${sens}\n` +
+          `💰 Prix actuel : <b>$${prix.toFixed(2)}</b>\n` +
+          `🎯 Zone cible : $${entree.toFixed(2)} (écart : ${ecartPct.toFixed(2)}%)\n` +
+          `🛑 Stop : $${signal.stop} | TP1 : $${signal.tp1}\n\n` +
+          `→ Réponds <code>pris ${signal.ticker}</code> pour enregistrer le trade`
+        );
+
+        proximityAlertsSent.add(alertKey);
+        console.log(`[CRON] Alerte proximité envoyée : ${signal.ticker} @ $${prix.toFixed(2)} (entrée $${entree})`);
+      }
+    } catch (err) {
+      console.warn(`[CRON] Proximité ${signal.ticker}:`, err.message);
+    }
+  }
+}
+
+/**
+ * Initialise les jobs CRON.
+ * - 09h00 EST : scan pré-ouverture (30 min d'avance)
+ * - Toutes les 5 min (9h30-16h00 EST) : alertes de proximité
  */
 function initCron() {
-  const task = cron.schedule('25 9 * * 1-5', async () => {
-    console.log('[CRON] Déclenchement automatique 09h25 EST');
+  // Scan principal à 9h00 EST — 30 min avant l'ouverture
+  const scanTask = cron.schedule('0 9 * * 1-5', async () => {
+    console.log('[CRON] Scan pré-ouverture 09h00 EST');
     try {
       await triggerManualScan();
     } catch (err) {
-      console.error('[CRON] Erreur non gérée:', err.message);
-      await sendAlert(`🔴 <b>AXIOM — Erreur cron scan</b>\n${err.message}`);
+      console.error('[CRON] Erreur scan:', err.message);
+      await sendAlert(`🔴 <b>AXIOM — Erreur scan 09h00</b>\n${err.message}`);
     }
-  }, {
-    timezone: 'America/New_York',
-  });
+  }, { timezone: 'America/New_York' });
 
-  console.log('[CRON] Job 09h25 EST (lun-ven) configuré');
-  return task;
+  // Alertes de proximité toutes les 5 min pendant les heures de marché
+  const proximityTask = cron.schedule('*/5 9-16 * * 1-5', async () => {
+    // Ne pas lancer avant 9h30 (ouverture) ni après 16h00 (fermeture)
+    const now = new Date();
+    const estHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }));
+    const estMin = now.toLocaleString('en-US', { timeZone: 'America/New_York', minute: 'numeric' });
+    if (estHour < 9 || (estHour === 9 && parseInt(estMin) < 30)) return;
+    if (estHour >= 16) return;
+
+    try {
+      await checkProximityAlerts();
+    } catch (err) {
+      console.warn('[CRON] Erreur alertes proximité:', err.message);
+    }
+  }, { timezone: 'America/New_York' });
+
+  console.log('[CRON] Jobs configurés : scan 09h00 EST + alertes proximité toutes les 5 min');
+  return { scanTask, proximityTask };
 }
 
 module.exports = { initCron, triggerManualScan };
