@@ -183,16 +183,20 @@ async function sendSignal(signal) {
   // Format étendu si données fondamentales disponibles
   const hasExtended = setup || rsi || pe || consensus;
 
+  // Emoji et label de recommandation
+  const hasRecoKeyword = recommandation?.includes('ENTRER') || recommandation?.includes('ATTENDRE') || recommandation?.includes('ÉVITER');
+  const emojiReco = hasRecoKeyword
+    ? (recommandation.includes('ENTRER') ? '✅' : recommandation.includes('ATTENDRE') ? '⚠️' : '❌')
+    : (direction === 'SHORT' ? '📉' : '📈');
+  const labelReco = hasRecoKeyword ? recommandation : direction;
+
   let message;
   if (hasExtended) {
-    const emojiReco = recommandation?.includes('ENTRER') ? '✅' :
-                      recommandation?.includes('ATTENDRE') ? '⚠️' : '❌';
-
     message = `🚨 <b>SETUP DÉTECTÉ — ${ticker}</b>
 ${phraseVerdict ? `<i>${phraseVerdict}</i>` : ''}
 
 📊 <b>Technique :</b> ${setup} | RSI ${rsi} | Vol x${ratioVolume}
-💼 <b>Fondamental :</b> P/E ${pe} | Analystes ${consensus} | Earnings dans ${joursEarnings}j
+💼 <b>Fondamental :</b> P/E ${pe} | Analystes ${consensus}${joursEarnings ? ` | Earnings dans ${joursEarnings}j` : ''}
 
 💰 <b>Entrée :</b> ${entree}
 🛑 <b>Stop :</b> ${stop}${pctRisque ? ` (-${pctRisque}%)` : ''}
@@ -200,7 +204,7 @@ ${phraseVerdict ? `<i>${phraseVerdict}</i>` : ''}
 ⚖️ <b>R:R :</b> ${rr} | 🔥 <b>Conviction :</b> ${conviction}/10
 ${quantite ? `📦 <b>Taille :</b> ${quantite} actions (${montantRisque}€ risqués)` : ''}
 
-${emojiReco} <b>${recommandation || direction}</b>
+${emojiReco} <b>${labelReco}</b>
 
 ⏰ ${new Date().toLocaleString('fr-FR', { timeZone: 'America/New_York' })} EST`;
   } else {

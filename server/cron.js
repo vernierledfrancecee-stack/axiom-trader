@@ -5,6 +5,7 @@
 
 const cron = require('node-cron');
 const { sendAlert, sendSignal } = require('./telegram');
+const { getFundamentals } = require('./fundamental');
 
 /**
  * Parse la réponse JSON de Marcus pour extraire les signaux structurés.
@@ -22,30 +23,70 @@ function extractSignals(result) {
     if (!setup.ticker) continue;
     if (setup.signal === 'NO TRADE') continue;
 
-    // Extraire les prix depuis les chaînes format "$XXX" ou "XXX-XXX"
+    /**
+     * Parse un prix depuis une chaîne.
+     * Gère : "$595", "$595-600", "595 - 600", "$595.50 (résistance clé)"
+     * Prend le milieu d'une plage, ou le PREMIER prix trouvé (pas la moyenne).
+     */
     function parsePrice(str) {
       if (!str) return null;
-      const nums = (String(str).match(/[\d.]+/g) || []).map(Number).filter(Boolean);
-      if (!nums.length) return null;
-      return nums.reduce((a, b) => a + b, 0) / nums.length;
+      const s = String(str);
+      // Plage : "$595-600" ou "595 - 600" ou "$595–$600"
+      const rangeMatch = s.match(/\$?([\d,]+\.?\d*)\s*[-–]\s*\$?([\d,]+\.?\d*)/);
+      if (rangeMatch) {
+        const low = parseFloat(rangeMatch[1].replace(',', ''));
+        const high = parseFloat(rangeMatch[2].replace(',', ''));
+        if (!isNaN(low) && !isNaN(high) && high > low && high < low * 1.5) {
+          return (low + high) / 2;
+        }
+      }
+      // Premier prix valide (précédé de $ ou en début de token)
+      const priceMatch = s.match(/\$\s*([\d,]+\.?\d+)/);
+      if (priceMatch) {
+        const val = parseFloat(priceMatch[1].replace(',', ''));
+        if (!isNaN(val) && val > 0) return val;
+      }
+      // Premier nombre dans la chaîne
+      const firstNum = s.match(/([\d,]+\.?\d+)/);
+      if (firstNum) {
+        const val = parseFloat(firstNum[1].replace(',', ''));
+        if (!isNaN(val) && val > 0) return val;
+      }
+      return null;
     }
 
-    const entree = parsePrice(setup.entryZone);
+    const entree = parsePrice(setup.entryZone || setup.prixActuel);
     const stop = parsePrice(setup.stopLoss);
     const tp1 = parsePrice(setup.target1);
     const tp2 = parsePrice(setup.target2);
 
+    // Vérification de cohérence : stop et TP doivent être du bon côté de l'entrée
+    const direction = setup.signal || setup.direction || 'LONG';
+    if (entree && stop && tp1) {
+      if (direction === 'LONG') {
+        if (stop >= entree || tp1 <= entree) {
+          console.warn(`[CRON] Setup ${setup.ticker} incohérent (LONG) : entrée=${entree} stop=${stop} tp1=${tp1} — ignoré`);
+          continue;
+        }
+      } else if (direction === 'SHORT') {
+        if (stop <= entree || tp1 >= entree) {
+          console.warn(`[CRON] Setup ${setup.ticker} incohérent (SHORT) : entrée=${entree} stop=${stop} tp1=${tp1} — ignoré`);
+          continue;
+        }
+      }
+    }
+
     if (!entree || !stop || !tp1) continue;
 
     const rr = setup.riskReward || (tp1 && entree && stop
-      ? `1:${((tp1 - entree) / Math.abs(entree - stop)).toFixed(1)}`
+      ? `1:${((Math.abs(tp1 - entree)) / Math.abs(entree - stop)).toFixed(1)}`
       : '?');
 
     const conviction = Math.round((setup.conviction || 0) / 10);
 
     signals.push({
       ticker: setup.ticker,
-      direction: setup.signal || setup.direction || 'LONG',
+      direction,
       entree: entree.toFixed(2),
       stop: stop.toFixed(2),
       tp1: tp1 ? tp1.toFixed(2) : '?',
@@ -181,7 +222,18 @@ Utilise la recherche web pour trouver les meilleures opportunités du jour. Trou
     await sendAlert(`📊 <b>AXIOM — Scan 09h25 EST</b>\n\n${result.marketBrief}\n<b>Condition :</b> ${result.marketCondition} | <b>VIX :</b> ${result.vixLevel}\n<b>Secteur :</b> ${result.sectorFocus}\n\n🔍 <b>${signals.length} setup(s) détecté(s)...</b>`);
   }
 
+  // Enrichir les signaux avec les données fondamentales
   for (const signal of signals) {
+    try {
+      const fund = await getFundamentals(signal.ticker);
+      if (fund) {
+        signal.pe = fund.peTrailing ? fund.peTrailing.toFixed(1) : (signal.pe || '');
+        signal.consensus = fund.consensusLabel || (signal.consensus || '');
+        signal.joursEarnings = fund.daysToEarnings != null ? fund.daysToEarnings : (signal.joursEarnings || '');
+      }
+    } catch (err) {
+      console.warn(`[CRON] Fondamentaux ${signal.ticker} indisponibles:`, err.message);
+    }
     await sendSignal(signal);
     // Petit délai pour éviter le rate limiting Telegram
     await new Promise(r => setTimeout(r, 500));
