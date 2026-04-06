@@ -7,6 +7,53 @@ const cron = require('node-cron');
 const { sendAlert, sendSignal } = require('./telegram');
 const { getFundamentals } = require('./fundamental');
 
+// Watchlist identique au client — 28 grandes caps liquides S&P500/NASDAQ
+const WATCHLIST = [
+  'AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN', 'META', 'GOOGL', 'NFLX',
+  'AMD', 'INTC', 'QCOM', 'AVGO',
+  'JPM', 'BAC', 'GS', 'V', 'MA',
+  'XOM', 'CVX',
+  'UNH', 'LLY', 'JNJ',
+  'BA', 'CAT', 'GE',
+  'SPY', 'QQQ', 'GLD',
+];
+
+/**
+ * Récupère le prix actuel d'un ticker via Yahoo Finance.
+ */
+async function fetchLivePrice(ticker) {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1m&range=1d`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const meta = data?.chart?.result?.[0]?.meta;
+    return meta?.regularMarketPrice || meta?.previousClose || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pré-charge les prix de la watchlist en parallèle.
+ * Retourne un objet { TICKER: price }
+ */
+async function prefetchWatchlistPrices() {
+  const results = await Promise.all(
+    WATCHLIST.map(async (ticker) => {
+      const price = await fetchLivePrice(ticker);
+      return [ticker, price];
+    })
+  );
+  const map = {};
+  for (const [ticker, price] of results) {
+    if (price) map[ticker] = price;
+  }
+  return map;
+}
+
 /**
  * Parse la réponse JSON de Marcus pour extraire les signaux structurés.
  * @param {Object} result - Résultat de huntMarket()
@@ -157,10 +204,26 @@ JSON VALIDE UNIQUEMENT:
   "avoidList": ["ticker1", "ticker2"]
 }`;
 
+    // Pré-charger les prix réels de la watchlist
+    console.log('[CRON] Chargement des prix de la watchlist...');
+    const priceMap = await prefetchWatchlistPrices();
+    const priceCount = Object.keys(priceMap).length;
+    console.log(`[CRON] ${priceCount}/${WATCHLIST.length} prix chargés`);
+
+    const priceTable = WATCHLIST
+      .filter(t => priceMap[t])
+      .map(t => `${t}:$${priceMap[t].toFixed(2)}`)
+      .join(' | ');
+
     const capital = process.env.CAPITAL_INITIAL || 5000;
     const userMessage = `Scanne le marché MAINTENANT. Capital disponible : $${capital}. Mode : SWING.
 
-Utilise la recherche web pour trouver les meilleures opportunités du jour. Trouve 3-4 setups à forte conviction en respectant toutes les règles. Retourne le JSON.`;
+WATCHLIST AUTORISÉE — choisis UNIQUEMENT parmi ces titres :
+${priceTable}
+
+Ces prix sont réels (moins de 2 minutes). La zone d'entrée DOIT être à ±2% du prix fourni.
+Utilise la recherche web pour identifier les catalyseurs, actualités et momentum du jour sur ces titres.
+Trouve 3-4 setups à forte conviction en respectant toutes les règles. Retourne le JSON.`;
 
     const headers = {
       'Content-Type': 'application/json',
@@ -213,7 +276,8 @@ Utilise la recherche web pour trouver les meilleures opportunités du jour. Trou
   console.log(`[CRON] ${signals.length} signal(s) détecté(s)`);
 
   if (signals.length === 0) {
-    await sendAlert('📊 Scan 09h25 terminé — aucun setup qualifié aujourd\'hui');
+    const condition = result.marketCondition || 'INCONNU';
+    await sendAlert(`📊 <b>AXIOM — Scan 09h25 EST</b>\n\nAucun setup qualifié aujourd'hui.\n<b>Condition marché :</b> ${condition}\n${result.marketBrief ? '\n' + result.marketBrief : ''}`);
     return { success: true, signals: 0, marketCondition: result.marketCondition };
   }
 
