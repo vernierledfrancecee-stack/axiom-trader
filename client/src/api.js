@@ -269,9 +269,43 @@ Retourne le JSON.`;
 }
 
 export async function deepDive(ticker, profile) {
+  const t = ticker.toUpperCase();
   const profileCtx = buildProfileContext(profile);
   const system = SINGLE_SYSTEM + profileCtx;
-  const userMessage = `Analyse ${ticker.toUpperCase()} maintenant. Prix actuel, actualités, niveaux techniques, volume. Retourne le JSON.`;
 
-  return callAxiom(system, userMessage, 'claude-haiku-4-5-20251001');
+  // Pré-charger prix live + technicals en parallèle
+  const [livePrice, techData] = await Promise.all([
+    fetchCurrentPrice(t),
+    fetch(`/api/technicals/${t}`).then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
+
+  // Construire le contexte de données réelles à injecter dans le prompt
+  let dataContext = '';
+
+  if (livePrice) {
+    dataContext += `\nPRIX ACTUEL (temps réel) : $${livePrice.toFixed(2)}`;
+  }
+
+  if (techData) {
+    const td = techData;
+    dataContext += `\n\nINDICATEURS TECHNIQUES (calculés sur données Yahoo Finance) :`;
+    if (td.ema20) dataContext += `\n• EMA 20 : $${td.ema20.toFixed(2)}`;
+    if (td.ema50) dataContext += `\n• EMA 50 : $${td.ema50.toFixed(2)}`;
+    if (td.ema200) dataContext += `\n• EMA 200 : $${td.ema200.toFixed(2)}`;
+    if (td.rsi14 != null) dataContext += `\n• RSI 14 : ${td.rsi14.toFixed(1)}${td.rsi14 > 70 ? ' ⚠️ SURACHETÉ' : td.rsi14 < 30 ? ' ⚠️ SURVENDU' : ''}`;
+    if (td.macd) dataContext += `\n• MACD : ${td.macd.macd?.toFixed(3)} | Signal : ${td.macd.signal?.toFixed(3)} | Histo : ${td.macd.histogram?.toFixed(3)}`;
+    if (td.volumeRatio) dataContext += `\n• Volume ratio (vs moy 20j) : x${td.volumeRatio.toFixed(2)}`;
+    if (td.tendance) dataContext += `\n• Tendance globale : ${td.tendance}`;
+  }
+
+  const userMessage = `Analyse ${t} maintenant.
+${dataContext || ''}
+
+${dataContext ? 'Utilise CES données réelles comme base de ton analyse.' : ''}
+Utilise la recherche web pour les actualités, catalyseurs et contexte macro du jour.
+Génère un signal actionnable avec des niveaux précis basés sur le prix actuel.
+Retourne le JSON.`;
+
+  // Sonnet + web search pour avoir actualités + contexte macro
+  return callAxiom(system, userMessage, 'claude-sonnet-4-6', true);
 }
