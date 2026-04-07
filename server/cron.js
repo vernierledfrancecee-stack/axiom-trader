@@ -222,7 +222,7 @@ JSON VALIDE UNIQUEMENT:
 WATCHLIST AUTORISÉE — choisis UNIQUEMENT parmi ces titres :
 ${priceTable}
 
-Ces prix sont réels (moins de 2 minutes). La zone d'entrée DOIT être à ±2% du prix fourni.
+Ces prix sont réels (moins de 2 minutes). Zone d'entrée : pour un LONG, place l'entrée sur le support technique (max 6% sous le prix actuel). Pour un SHORT, place l'entrée sur la résistance (max 6% au-dessus). Évite les entrées trop loin (>6%) qui rendraient le trade irreprenable.
 Utilise la recherche web pour identifier les catalyseurs, actualités et momentum du jour sur ces titres.
 Trouve 3-4 setups à forte conviction en respectant toutes les règles. Retourne le JSON.`;
 
@@ -337,12 +337,18 @@ async function checkProximityAlerts() {
       if (!entree) continue;
 
       const ecartPct = Math.abs((prix - entree) / entree) * 100;
+      const direction = signal.direction || 'LONG';
 
-      // Alerte si prix dans un rayon de 0.8% de la zone d'entrée
-      if (ecartPct <= 0.8) {
-        const direction = signal.direction || 'LONG';
+      // Pour LONG : alerte seulement si le prix descend vers l'entrée (par le haut)
+      // Pour SHORT : alerte seulement si le prix monte vers l'entrée (par le bas)
+      const approcheLong = direction === 'LONG' && prix >= entree;
+      const approcheShort = direction === 'SHORT' && prix <= entree;
+      const approcheBonneDirection = approcheLong || approcheShort;
+
+      // Alerte si prix dans un rayon de 0.8% de la zone d'entrée ET vient du bon côté
+      if (ecartPct <= 0.8 && approcheBonneDirection) {
         const emojiDir = direction === 'LONG' ? '📈' : '📉';
-        const sens = prix < entree ? 'approche par le bas' : 'approche par le haut';
+        const sens = direction === 'LONG' ? 'pullback vers support' : 'rebond vers résistance';
 
         await sendAlert(
           `⚡ <b>ZONE D'ENTRÉE ATTEINTE — ${signal.ticker}</b>\n\n` +
