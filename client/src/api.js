@@ -6,7 +6,7 @@ PROFIL DU TRADER : ${profile.name} — ${profile.experience} d'expérience en tr
 
 const RULES = `Marcus Reid, trader institutionnel 20 ans NYSE/NASDAQ. Français uniquement. Froid, factuel.
 R1:stop-loss obligatoire R2:R/R≥1:1.5 R3:max 2% capital R4:max 3 positions R5:drawdown>3%→stop R6:2 indicateurs min R7:volume confirme prix
-R8:CRITIQUE — l'entrée DOIT être proche du prix actuel (max 3% d'écart). Si le prix actuel est déjà loin de la zone d'entrée, baisser la conviction ou marquer EN ATTENTE.
+R8:Zone d'entrée sur niveau technique réel (support pour LONG, résistance pour SHORT). Max 6% d'écart acceptable. Au-delà, marquer INVALIDE.
 JSON VALIDE UNIQUEMENT:`;
 
 const HUNTER_SYSTEM = RULES + `
@@ -189,17 +189,44 @@ async function validateSetupsWithLivePrices(result) {
 
       if (entree) {
         ecartPct = ((livePrice - entree) / entree) * 100;
-        const absEcart = Math.abs(ecartPct);
+        const direction = (setup.direction || setup.signal || 'LONG').toUpperCase();
 
-        // Prix déjà loin de la zone d'entrée
-        if (absEcart > 5) {
-          newStatus = 'INVALIDE';
-          newConviction = Math.min(newConviction, 20);
-        } else if (absEcart > 2) {
-          newStatus = 'EN ATTENTE';
-          newConviction = Math.min(newConviction, 50);
+        if (direction === 'LONG') {
+          // LONG : on veut acheter sur un pullback vers l'entrée
+          if (livePrice < entree * 0.98) {
+            // Support cassé — le prix est tombé sous la zone d'entrée
+            newStatus = 'INVALIDE';
+            newConviction = Math.min(newConviction, 20);
+          } else if (livePrice <= entree * 1.015) {
+            // Dans la zone d'entrée (±1.5%) — ordre déclenchable maintenant
+            newStatus = newStatus || 'IMMÉDIAT';
+          } else if (livePrice <= entree * 1.06) {
+            // Prix au-dessus de l'entrée — attendre le pullback (comportement normal)
+            newStatus = 'EN ATTENTE';
+            // Conviction préservée : c'est un setup valide en attente de recul
+          } else {
+            // Prix >6% au-dessus de l'entrée — opportunité manquée
+            newStatus = 'INVALIDE';
+            newConviction = Math.min(newConviction, 20);
+          }
         } else {
-          newStatus = newStatus || 'IMMÉDIAT';
+          // SHORT : on veut vendre sur un rebond vers l'entrée
+          if (livePrice > entree * 1.02) {
+            // Résistance cassée — le prix est monté au-dessus de la zone d'entrée
+            newStatus = 'INVALIDE';
+            newConviction = Math.min(newConviction, 20);
+          } else if (livePrice >= entree * 0.985) {
+            // Dans la zone d'entrée (±1.5%) — ordre déclenchable maintenant
+            newStatus = newStatus || 'IMMÉDIAT';
+          } else if (livePrice >= entree * 0.94) {
+            // Prix sous l'entrée — attendre le rebond (comportement normal)
+            newStatus = 'EN ATTENTE';
+            // Conviction préservée
+          } else {
+            // Prix >6% sous l'entrée — opportunité manquée
+            newStatus = 'INVALIDE';
+            newConviction = Math.min(newConviction, 20);
+          }
         }
       }
 
@@ -256,7 +283,7 @@ WATCHLIST AUTORISÉE — tu dois choisir UNIQUEMENT parmi ces titres :
 ${priceTable}
 
 Ces prix sont RÉELS et datent de moins de 2 minutes. Tu DOIS utiliser ces prix comme base pour tes zones d'entrée.
-La zone d'entrée doit être à ±2% maximum du prix fourni.
+Zone d'entrée : pour un LONG, place l'entrée sur le support technique (max 6% sous le prix actuel). Pour un SHORT, place l'entrée sur la résistance (max 6% au-dessus). Évite les entrées trop loin (>6%) qui rendraient le trade irreprenable.
 
 Utilise la recherche web pour identifier les catalyseurs, actualités et momentum du jour sur ces titres.
 Sélectionne les 4 meilleurs setups parmi la watchlist, avec des niveaux cohérents avec les prix ci-dessus.
