@@ -271,7 +271,6 @@ Retourne le JSON.`;
 export async function deepDive(ticker, profile) {
   const t = ticker.toUpperCase();
   const profileCtx = buildProfileContext(profile);
-  const system = SINGLE_SYSTEM + profileCtx;
 
   // Pré-charger prix live + technicals en parallèle
   const [livePrice, techData] = await Promise.all([
@@ -281,31 +280,57 @@ export async function deepDive(ticker, profile) {
 
   // Construire le contexte de données réelles à injecter dans le prompt
   let dataContext = '';
-
   if (livePrice) {
-    dataContext += `\nPRIX ACTUEL (temps réel) : $${livePrice.toFixed(2)}`;
+    dataContext += `PRIX ACTUEL (temps réel) : $${livePrice.toFixed(2)}\n`;
   }
-
   if (techData) {
     const td = techData;
-    dataContext += `\n\nINDICATEURS TECHNIQUES (calculés sur données Yahoo Finance) :`;
-    if (td.ema20) dataContext += `\n• EMA 20 : $${td.ema20.toFixed(2)}`;
-    if (td.ema50) dataContext += `\n• EMA 50 : $${td.ema50.toFixed(2)}`;
-    if (td.ema200) dataContext += `\n• EMA 200 : $${td.ema200.toFixed(2)}`;
-    if (td.rsi14 != null) dataContext += `\n• RSI 14 : ${td.rsi14.toFixed(1)}${td.rsi14 > 70 ? ' ⚠️ SURACHETÉ' : td.rsi14 < 30 ? ' ⚠️ SURVENDU' : ''}`;
-    if (td.macd) dataContext += `\n• MACD : ${td.macd.macd?.toFixed(3)} | Signal : ${td.macd.signal?.toFixed(3)} | Histo : ${td.macd.histogram?.toFixed(3)}`;
-    if (td.volumeRatio) dataContext += `\n• Volume ratio (vs moy 20j) : x${td.volumeRatio.toFixed(2)}`;
-    if (td.tendance) dataContext += `\n• Tendance globale : ${td.tendance}`;
+    dataContext += `INDICATEURS TECHNIQUES (Yahoo Finance) :\n`;
+    if (td.ema20)    dataContext += `• EMA 20 : $${td.ema20.toFixed(2)}\n`;
+    if (td.ema50)    dataContext += `• EMA 50 : $${td.ema50.toFixed(2)}\n`;
+    if (td.ema200)   dataContext += `• EMA 200 : $${td.ema200.toFixed(2)}\n`;
+    if (td.rsi14 != null) dataContext += `• RSI 14 : ${td.rsi14.toFixed(1)}${td.rsi14 > 70 ? ' (SURACHETÉ)' : td.rsi14 < 30 ? ' (SURVENDU)' : ''}\n`;
+    if (td.macd)     dataContext += `• MACD : ${td.macd.macd?.toFixed(3)} | Signal : ${td.macd.signal?.toFixed(3)} | Histo : ${td.macd.histogram?.toFixed(3)}\n`;
+    if (td.volumeRatio) dataContext += `• Volume ratio vs moy 20j : x${td.volumeRatio.toFixed(2)}\n`;
+    if (td.tendance) dataContext += `• Tendance : ${td.tendance}\n`;
   }
 
-  const userMessage = `Analyse ${t} maintenant.
-${dataContext || ''}
+  // System prompt dédié Deep Dive — sans échappatoire "NO TRADE"
+  const DEEP_DIVE_SYSTEM = `Tu es Marcus Reid, trader institutionnel 20 ans NYSE/NASDAQ. Français uniquement. Froid, factuel.
+RÈGLES : R1:stop-loss obligatoire R2:R/R≥1:1.5 R3:max 2% capital R6:2 indicateurs min R7:volume confirme
 
-${dataContext ? 'Utilise CES données réelles comme base de ton analyse.' : ''}
-Utilise la recherche web pour les actualités, catalyseurs et contexte macro du jour.
-Génère un signal actionnable avec des niveaux précis basés sur le prix actuel.
+IMPORTANT : Tu as accès à la recherche web ET aux données techniques ci-dessous. Ces données SONT réelles.
+Tu DOIS produire un signal LONG ou SHORT avec des niveaux précis. "NO TRADE" n'est autorisé QUE si le setup est objectivement dangereux (earnings dans <48h, halt de trading, etc.).
+Ne dis JAMAIS "données insuffisantes" — utilise le prix fourni et la recherche web pour compléter.
+
+RÉPONDS UNIQUEMENT AVEC DU JSON VALIDE :
+{
+  "ticker": "string",
+  "signal": "LONG" | "SHORT" | "NO TRADE",
+  "timeframe": "SCALP" | "DAY TRADE" | "SWING 24H" | "SWING 48H",
+  "conviction": number (0-100),
+  "prixActuel": "string",
+  "setupStatus": "IMMÉDIAT" | "EN ATTENTE" | "INVALIDE",
+  "entryZone": "string",
+  "stopLoss": "string",
+  "target1": "string",
+  "target2": "string",
+  "riskReward": "string",
+  "maxRiskPct": "string",
+  "catalyst": "string",
+  "technicalSetup": "string",
+  "invalidationNote": "string",
+  "urgency": "HIGH" | "MEDIUM" | "LOW",
+  "thesis": "string",
+  "warning": "string"
+}`;
+
+  const userMessage = `Analyse ${t} maintenant.
+
+${dataContext || `Prix actuel non disponible — utilise la recherche web pour le trouver.\n`}
+Complète avec la recherche web : actualités du jour, catalyseurs, contexte macro, sentiment.
+Génère un signal actionnable avec entrée, stop et objectifs basés sur le prix réel.
 Retourne le JSON.`;
 
-  // Sonnet + web search pour avoir actualités + contexte macro
-  return callAxiom(system, userMessage, 'claude-sonnet-4-6', true);
+  return callAxiom(DEEP_DIVE_SYSTEM + (profileCtx || ''), userMessage, 'claude-sonnet-4-6', true);
 }
