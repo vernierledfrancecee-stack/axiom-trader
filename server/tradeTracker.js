@@ -34,10 +34,9 @@ async function fetchCurrentPrice(ticker) {
  * Génère le rapport post-trade via Claude Haiku.
  */
 async function generateTradeReport(trade, pnl, pnlPct, raison) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return 'Rapport non disponible (API key absente).';
-
   try {
+    const { callGemini } = require('./gemini');
+
     const prompt = `Tu es Marcus Reid, trader senior. Analyse ce trade terminé et donne un retour factuel en 3-4 phrases maximum.
 
 Trade : ${trade.ticker} (${trade.direction})
@@ -48,22 +47,8 @@ Durée : ${trade.dureeMinutes || '?'} minutes
 
 Analyse ce qui a fonctionné ou échoué. Sois bref, direct, pédagogique.`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    const data = await response.json();
-    return data.content?.[0]?.text || 'Rapport non disponible.';
+    const text = await callGemini('', prompt, { maxTokens: 300 });
+    return text || 'Rapport non disponible.';
   } catch (err) {
     return `Rapport non disponible: ${err.message}`;
   }
