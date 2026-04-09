@@ -289,7 +289,7 @@ Utilise la recherche web pour identifier les catalyseurs, actualités et momentu
 Sélectionne les 4 meilleurs setups parmi la watchlist, avec des niveaux cohérents avec les prix ci-dessus.
 Retourne le JSON.`;
 
-  const result = await callAxiom(system, userMessage, 'claude-sonnet-4-6', true);
+  const result = await callAxiom(system, userMessage, null, true);
 
   // Validation live des prix après la réponse IA
   return validateSetupsWithLivePrices(result);
@@ -333,6 +333,5 @@ Utilise la recherche web pour les actualités, catalyseurs et contexte macro du 
 Génère un signal actionnable avec des niveaux précis basés sur le prix actuel.
 Retourne le JSON.`;
 
-  // Sonnet + web search pour avoir actualités + contexte macro
-  return callAxiom(system, userMessage, 'claude-sonnet-4-6', true);
+  return callAxiom(system, userMessage, null, true);
 }

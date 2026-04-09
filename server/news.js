@@ -14,26 +14,14 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
  */
 async function translateToFrench(text) {
   if (!text || text.trim() === '') return '';
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return text;
-
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
-        system: 'Tu es un traducteur financier expert. Traduis ce texte en français professionnel, concis. Retourne uniquement la traduction, rien d\'autre.',
-        messages: [{ role: 'user', content: text }],
-      }),
-    });
-    const data = await response.json();
-    return data.content?.[0]?.text || text;
+    const { callGemini } = require('./gemini');
+    const translated = await callGemini(
+      'Tu es un traducteur financier expert. Traduis ce texte en français professionnel, concis. Retourne uniquement la traduction, rien d\'autre.',
+      text,
+      { maxTokens: 400 }
+    );
+    return translated || text;
   } catch {
     return text;
   }
@@ -76,35 +64,14 @@ async function fetchYahooRSS() {
 /**
  * Fallback : utilise Claude avec web search pour récupérer les 5 dernières news.
  */
-async function fetchViaClaudeFallback() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return [];
-
+async function fetchViaGeminiFallback() {
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'web-search-2025-03-05',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 1 }],
-        messages: [{
-          role: 'user',
-          content: 'Donne-moi les 5 dernières actualités importantes des marchés financiers américains aujourd\'hui. Pour chaque news : titre en français, résumé en 1-2 phrases en français, ticker concerné si applicable. Format JSON array: [{titre, resume, ticker, lien}]',
-        }],
-      }),
-    });
-
-    const data = await response.json();
-    let fullText = '';
-    for (const block of (data.content || [])) {
-      if (block.type === 'text') fullText += block.text;
-    }
+    const { callGemini } = require('./gemini');
+    const fullText = await callGemini(
+      '',
+      'Donne-moi les 5 dernières actualités importantes des marchés financiers américains aujourd\'hui. Pour chaque news : titre en français, résumé en 1-2 phrases en français, ticker concerné si applicable. Format JSON array: [{titre, resume, ticker, lien}]',
+      { maxTokens: 1000, useWebSearch: true }
+    );
 
     const jsonMatch = fullText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) return [];
@@ -116,7 +83,7 @@ async function fetchViaClaudeFallback() {
       lien: a.lien || '#',
       date: new Date().toISOString(),
       image: null,
-      source: 'claude',
+      source: 'gemini',
       tickersMentionnes: a.ticker ? [a.ticker] : [],
       traduit: true,
     }));
@@ -172,9 +139,9 @@ async function getNews(tickers = []) {
     }
     articles = translated;
   } catch (err) {
-    console.warn('[News] Yahoo RSS échoué, fallback Claude:', err.message);
-    articles = await fetchViaClaudeFallback();
-    source = 'claude';
+    console.warn('[News] Yahoo RSS échoué, fallback Gemini:', err.message);
+    articles = await fetchViaGeminiFallback();
+    source = 'gemini';
   }
 
   // Filtrer si tickers spécifiés

@@ -115,55 +115,20 @@ app.get('/api/candles/:ticker', async (req, res) => {
   }
 });
 
-// ─── POST /api/axiom — Claude API streaming ───────────────────────────────────
+// ─── POST /api/axiom — Gemini 2.0 Flash (émule le format SSE Anthropic) ───────
 app.post('/api/axiom', async (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-
-  const { system, user, model, useWebSearch = false } = req.body;
+  const { system, user, useWebSearch = false } = req.body;
   if (!user) return res.status(400).json({ error: 'Missing user message' });
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'x-api-key': apiKey,
-    'anthropic-version': '2023-06-01',
-  };
-  if (useWebSearch) headers['anthropic-beta'] = 'web-search-2025-03-05';
-
-  const body = {
-    model: model || 'claude-haiku-4-5-20251001',
-    max_tokens: 4096,
-    system: system || '',
-    messages: [{ role: 'user', content: user }],
-    stream: true,
-  };
-  if (useWebSearch) {
-    body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }];
-  }
-
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
+    const { callGemini } = require('./gemini');
+    const text = await callGemini(system || '', user, { useWebSearch });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({ error: errorText });
-    }
-
+    // Émettre au format SSE Anthropic pour rétrocompatibilité client
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      res.write(decoder.decode(value, { stream: true }));
-    }
+    res.write(`data: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text } })}\n\n`);
     res.end();
   } catch (err) {
     logError('axiom', err);

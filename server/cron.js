@@ -170,9 +170,8 @@ async function triggerManualScan() {
   let source = 'api';
 
   try {
-    // Appel direct à l'API Anthropic côté serveur (équivalent à huntMarket du client)
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY absent');
+    // Appel à Gemini 2.0 Flash côté serveur
+    const { callGemini } = require('./gemini');
 
     const HUNTER_SYSTEM = `Tu es Marcus Reid, trader institutionnel 20 ans NYSE/NASDAQ. Français uniquement. Froid, factuel.
 R1:stop-loss obligatoire R2:R/R≥1:1.5 R3:max 2% capital R4:max 3 positions R5:drawdown>3%→stop R6:2 indicateurs min R7:volume confirme prix
@@ -226,41 +225,7 @@ Ces prix sont réels (moins de 2 minutes). Zone d'entrée : pour un LONG, place 
 Utilise la recherche web pour identifier les catalyseurs, actualités et momentum du jour sur ces titres.
 Trouve 3-4 setups à forte conviction en respectant toutes les règles. Retourne le JSON.`;
 
-    const headers = {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'web-search-2025-03-05',
-    };
-
-    const body = {
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      system: HUNTER_SYSTEM,
-      messages: [{ role: 'user', content: userMessage }],
-      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
-    };
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Anthropic API error ${response.status}: ${errText}`);
-    }
-
-    const data = await response.json();
-
-    // Extraire le texte de la réponse
-    let fullText = '';
-    if (data.content) {
-      for (const block of data.content) {
-        if (block.type === 'text') fullText += block.text;
-      }
-    }
+    const fullText = await callGemini(HUNTER_SYSTEM, userMessage, { useWebSearch: true });
 
     const jsonMatch = fullText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Aucun JSON dans la réponse Marcus');
