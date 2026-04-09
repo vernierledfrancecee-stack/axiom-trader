@@ -8,3 +8,8 @@ axiom/.env
 __pycache__/
 *.pyc
 axiom/__pycache__/
+
+# RuFlo runtime (données locales, ne pas commiter)
+.claude-flow/data/
+.claude-flow/logs/
+.claude-flow/sessions/
