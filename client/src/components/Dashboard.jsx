@@ -209,7 +209,7 @@ export default function Dashboard() {
               value={capitalInput}
               onChange={e => setCapitalInput(e.target.value)}
               style={{
-                background: C.bg3, border: `1px solid ${C.border2}`,
+                background: C.bg3, border: `1px solid var(--border2)`,
                 color: C.text, padding: '4px 8px', fontSize: 12,
                 fontFamily: 'IBM Plex Mono, monospace', width: 120,
               }}
@@ -333,7 +333,7 @@ export default function Dashboard() {
               <XAxis dataKey="jour" tick={{ fontSize: 9, fill: C.muted }} />
               <YAxis tick={{ fontSize: 9, fill: C.muted }} tickFormatter={v => `${v}€`} />
               <Tooltip content={<CustomTooltip isCurrency />} />
-              <ReferenceLine y={0} stroke={C.border2} />
+              <ReferenceLine y={0} stroke="var(--border2)" />
               <Bar dataKey="pnl_total" name="P&L"
                 fill={C.green}
                 radius={[2, 2, 0, 0]}

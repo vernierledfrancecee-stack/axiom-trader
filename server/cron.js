@@ -257,7 +257,7 @@ Trouve 3-4 setups à forte conviction en respectant toutes les règles. Retourne
     try {
       const fund = await getFundamentals(signal.ticker);
       if (fund) {
-        signal.pe = fund.peTrailing ? fund.peTrailing.toFixed(1) : (signal.pe || '');
+        signal.pe = fund.peTtm ? fund.peTtm.toFixed(1) : (signal.pe || '');
         signal.consensus = fund.consensusLabel || (signal.consensus || '');
         signal.joursEarnings = fund.daysToEarnings != null ? fund.daysToEarnings : (signal.joursEarnings || '');
       }

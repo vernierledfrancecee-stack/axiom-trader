@@ -319,9 +319,9 @@ export async function deepDive(ticker, profile) {
     if (td.ema20) dataContext += `\n• EMA 20 : $${td.ema20.toFixed(2)}`;
     if (td.ema50) dataContext += `\n• EMA 50 : $${td.ema50.toFixed(2)}`;
     if (td.ema200) dataContext += `\n• EMA 200 : $${td.ema200.toFixed(2)}`;
-    if (td.rsi14 != null) dataContext += `\n• RSI 14 : ${td.rsi14.toFixed(1)}${td.rsi14 > 70 ? ' ⚠️ SURACHETÉ' : td.rsi14 < 30 ? ' ⚠️ SURVENDU' : ''}`;
+    if (td.rsi != null) dataContext += `\n• RSI 14 : ${td.rsi.toFixed(1)}${td.rsi > 70 ? ' ⚠️ SURACHETÉ' : td.rsi < 30 ? ' ⚠️ SURVENDU' : ''}`;
     if (td.macd) dataContext += `\n• MACD : ${td.macd.macd?.toFixed(3)} | Signal : ${td.macd.signal?.toFixed(3)} | Histo : ${td.macd.histogram?.toFixed(3)}`;
-    if (td.volumeRatio) dataContext += `\n• Volume ratio (vs moy 20j) : x${td.volumeRatio.toFixed(2)}`;
+    if (td.ratioVolume) dataContext += `\n• Volume ratio (vs moy 20j) : x${td.ratioVolume.toFixed(2)}`;
     if (td.tendance) dataContext += `\n• Tendance globale : ${td.tendance}`;
   }
 
