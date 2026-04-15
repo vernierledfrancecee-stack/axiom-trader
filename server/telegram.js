@@ -259,7 +259,14 @@ function setupPollingHandlers() {
  * @param {string} message
  */
 async function sendAlert(message) {
-  if (!bot || !CHAT_ID) return;
+  if (!bot) {
+    console.warn('[Telegram] sendAlert ignoré : bot non initialisé (TELEGRAM_BOT_TOKEN absent ou invalide)');
+    return;
+  }
+  if (!CHAT_ID) {
+    console.warn('[Telegram] sendAlert ignoré : TELEGRAM_CHAT_ID absent dans les variables d\'environnement');
+    return;
+  }
   try {
     await bot.sendMessage(CHAT_ID, message, { parse_mode: 'HTML' });
   } catch (err) {
@@ -268,11 +275,36 @@ async function sendAlert(message) {
 }
 
 /**
+ * Teste la connexion Telegram en envoyant un message de diagnostic.
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
+async function testConnection() {
+  if (!bot) return { ok: false, error: 'Bot non initialisé — TELEGRAM_BOT_TOKEN manquant ou invalide' };
+  if (!CHAT_ID) return { ok: false, error: 'TELEGRAM_CHAT_ID absent' };
+  try {
+    await bot.sendMessage(CHAT_ID,
+      `🔔 <b>AXIOM — Test de connexion</b>\n\n✅ Les notifications Telegram fonctionnent correctement.\n⏰ ${new Date().toLocaleString('fr-FR', { timeZone: 'America/New_York' })} EST`,
+      { parse_mode: 'HTML' }
+    );
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
  * Formate et envoie un signal de trading.
  * @param {Object} signal
  */
 async function sendSignal(signal) {
-  if (!bot || !CHAT_ID) return;
+  if (!bot) {
+    console.warn('[Telegram] sendSignal ignoré : bot non initialisé (TELEGRAM_BOT_TOKEN absent ou invalide)');
+    return;
+  }
+  if (!CHAT_ID) {
+    console.warn('[Telegram] sendSignal ignoré : TELEGRAM_CHAT_ID absent dans les variables d\'environnement');
+    return;
+  }
 
   const {
     ticker = '?',
@@ -348,4 +380,4 @@ ${emojiReco} <b>${labelReco}</b>
   }
 }
 
-module.exports = { initBot, sendAlert, sendSignal };
+module.exports = { initBot, sendAlert, sendSignal, testConnection };

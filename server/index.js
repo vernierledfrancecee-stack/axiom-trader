@@ -80,7 +80,7 @@ function requireAdmin(req, res, next) {
 // ─── Initialisation des modules ───────────────────────────────────────────────
 const { initDatabase, getTradeHistory } = require('./database');
 const { initCron, triggerManualScan } = require('./cron');
-const { initBot } = require('./telegram');
+const { initBot, testConnection } = require('./telegram');
 const { getNews } = require('./news');
 const { openTrade, closeTrade, getActiveTrades } = require('./tradeTracker');
 const { getStats, getCapitalCurve, getDailyPnLStats, getSummary, initAnalyticsCron, saveCapitalSnapshot } = require('./analytics');
@@ -270,16 +270,42 @@ app.get('/api/technicals/:ticker', async (req, res) => {
 
 // ─── GET /health ──────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
+  const hasBotToken = !!process.env.TELEGRAM_BOT_TOKEN;
+  const hasChatId = !!process.env.TELEGRAM_CHAT_ID;
+  const hasGeminiKey = !!process.env.GEMINI_API_KEY;
   res.json({
     status: 'ok',
     uptime: Math.floor((Date.now() - START_TIME) / 1000),
     version: '2.0.0',
     tradesActifs: Object.keys(getActiveTrades()).length,
     cronActif: true,
-    telegramConnecte: !!process.env.TELEGRAM_BOT_TOKEN,
+    telegram: {
+      botToken: hasBotToken ? 'configuré' : 'MANQUANT',
+      chatId: hasChatId ? 'configuré' : 'MANQUANT',
+      polling: process.env.TELEGRAM_POLLING === 'true' ? 'activé' : 'désactivé',
+      pret: hasBotToken && hasChatId,
+    },
+    gemini: {
+      apiKey: hasGeminiKey ? 'configuré' : 'MANQUANT',
+    },
     nodeVersion: process.version,
     timestamp: new Date().toISOString(),
   });
+});
+
+// ─── POST /api/telegram-test ──────────────────────────────────────────────────
+app.post('/api/telegram-test', requireAdmin, async (req, res) => {
+  try {
+    const result = await testConnection();
+    if (result.ok) {
+      res.json({ success: true, message: 'Message de test envoyé sur Telegram avec succès.' });
+    } else {
+      res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    logError('telegram-test', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ─── GET /api/stats/summary ───────────────────────────────────────────────────

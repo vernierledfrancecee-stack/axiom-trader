@@ -142,6 +142,11 @@ async function openTrade(tradeData) {
     throw new Error(`Trade déjà actif sur ${ticker}`);
   }
 
+  const MAX_POS = parseInt(process.env.MAX_POSITIONS || 3);
+  if (activeTrades.size >= MAX_POS) {
+    throw new Error(`Maximum ${MAX_POS} positions simultanées atteint. Fermez un trade existant avant d'en ouvrir un nouveau.`);
+  }
+
   const dateOuverture = new Date().toISOString();
 
   const trade = {

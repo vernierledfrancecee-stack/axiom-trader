@@ -51,7 +51,7 @@ function isDailyQuotaExhausted(errBody) {
  * @param {boolean} [opts.useWebSearch=false] - Active Google Search grounding
  * @returns {Promise<string>} Texte généré
  */
-async function callGemini(system, userMessage, { maxTokens = 4096, useWebSearch = false } = {}) {
+async function callGemini(system, userMessage, { maxTokens = 8192, useWebSearch = false } = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY absent');
 
